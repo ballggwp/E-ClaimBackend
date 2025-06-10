@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
-interface Insured {
+interface Approver {
   id: string
   name: string
   position: string
@@ -12,19 +12,19 @@ interface Insured {
 export default function ClaimCreatePage() {
   const router = useRouter()
 
-  // ดึงรายชื่อผู้เอาประกัน
-  const [insuredList, setInsuredList] = useState<Insured[]>([])
+  // ดึงรายชื่อ approver (ผู้เซ็นเอกสาร)
+  const [approverList, setApproverList] = useState<Approver[]>([])
   useEffect(() => {
-    // TODO: fetch จาก API จริง
-    setInsuredList([
-      { id: '1', name: 'นายศักดิ์ เสนศรี', position: 'ผู้ช่วยกรรมการผู้จัดการ สายงานอ้อย' },
-      { id: '2', name: 'นางสมพร ใจดี', position: 'ผู้จัดการฝ่ายเคลม' },
+    // TODO: fetch approver list จาก API จริง
+    setApproverList([
+      { id: 'a1', name: 'คุณสมชาย ใจดี', position: 'หัวหน้าฝ่ายประกัน' },
+      { id: 'a2', name: 'คุณสายฝน แก้วใจ', position: 'ผู้จัดการฝ่ายประกัน' },
     ])
   }, [])
 
   // สเตทของฟอร์ม
   const [form, setForm] = useState({
-    insuredId: '', date: '', time: '', location: '', cause: '',
+    approverId: '', date: '', time: '', location: '', cause: '',
     policeDate: '', policeTime: '', policeStation: '',
     damageAmount: '', damageDetail: '', victimDetail: '',
     partnerName: '', partnerPhone: '', partnerLocation: '', partnerDamageDetail: '', partnerDamageAmount: '', partnerVictimDetail: ''
@@ -96,39 +96,37 @@ const handleOtherFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     }
   }
 
-  const selectedInsured = insuredList.find(
-    (i) => i.id === form.insuredId
-  )
+   const selectedApprover = approverList.find(a => a.id === form.approverId)
 
   // สร้าง preview URLs
   
   return (
-    <div className="max-w-3xl mx-auto p-6">
+     <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-2xl mb-6">แจ้งอุบัติเหตุ</h1>
-
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* ผู้เอาประกัน */}
+
+        {/* เลือก Approver */}
         <div>
-          <label className="block mb-1">
-            เลือกผู้อนุมัติ <span className="text-red-600">*</span>
+          <label className="block mb-1 font-medium">
+            เลือกผู้อนุมัติเอกสาร <span className="text-red-600">*</span>
           </label>
           <select
-            name="insuredId"
-            value={form.insuredId}
+            name="approverId"
+            value={form.approverId}
             onChange={handleChange}
             required
             className="w-full border p-2 rounded"
           >
             <option value="">-- เลือก --</option>
-            {insuredList.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.name}
+            {approverList.map(a => (
+              <option key={a.id} value={a.id}>
+                {a.name}
               </option>
             ))}
           </select>
-          {selectedInsured && (
+          {selectedApprover && (
             <p className="mt-1 text-gray-600">
-              ตำแหน่ง: {selectedInsured.position}
+              ตำแหน่ง: {selectedApprover.position}
             </p>
           )}
         </div>
