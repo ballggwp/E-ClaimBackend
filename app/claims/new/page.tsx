@@ -1,110 +1,119 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 interface Approver {
-  id: string
-  name: string
-  position: string
+  id: string;
+  name: string;
+  position: string;
 }
-
+const API = process.env.NEXT_PUBLIC_BACKEND_URL;
 export default function ClaimCreatePage() {
-  const router = useRouter()
+  const router = useRouter();
 
   // ดึงรายชื่อ approver (ผู้เซ็นเอกสาร)
-  const [approverList, setApproverList] = useState<Approver[]>([])
-  useEffect(() => {
-    // TODO: fetch approver list จาก API จริง
-    setApproverList([
-      { id: 'a1', name: 'คุณสมชาย ใจดี', position: 'หัวหน้าฝ่ายประกัน' },
-      { id: 'a2', name: 'คุณสายฝน แก้วใจ', position: 'ผู้จัดการฝ่ายประกัน' },
-    ])
-  }, [])
+  const [approverList, setApproverList] = useState<Approver[]>([]);
 
   // สเตทของฟอร์ม
   const [form, setForm] = useState({
-    approverId: '', date: '', time: '', location: '', cause: '',
-    policeDate: '', policeTime: '', policeStation: '',
-    damageAmount: '', damageDetail: '', victimDetail: '',
-    partnerName: '', partnerPhone: '', partnerLocation: '', partnerDamageDetail: '', partnerDamageAmount: '', partnerVictimDetail: ''
-  })
-  const [damageOwnType, setDamageOwnType] = useState<'mitrphol'|'other'>('mitrphol')
-  const [damageOtherOwn, setDamageOtherOwn] = useState('')
-  const [damageFiles, setDamageFiles] = useState<File[]>([])
-  const [estimateFiles, setEstimateFiles] = useState<File[]>([])
-  const [otherFiles, setOtherFiles] = useState<File[]>([])
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+    approverId: "",
+    accidentDate: "",
+    accidentTime: "",
+    location: "",
+    cause: "",
+    policeDate: "",
+    policeTime: "",
+    policeStation: "",
+    damageOwnType: "mitrphol",
+    damageOtherOwn: "",
+    damageDetail: "",
+    damageAmount: "",
+    victimDetail: "",
+    partnerName: "",
+    partnerPhone: "",
+    partnerLocation: "",
+    partnerDamageDetail: "",
+    partnerDamageAmount: "",
+    partnerVictimDetail: "",
+  });
+  const [damageOwnType, setDamageOwnType] = useState<"mitrphol" | "other">(
+    "mitrphol"
+  );
+  const [damageOtherOwn, setDamageOtherOwn] = useState("");
+  const [damageFiles, setDamageFiles] = useState<File[]>([]);
+  const [estimateFiles, setEstimateFiles] = useState<File[]>([]);
+  const [otherFiles, setOtherFiles] = useState<File[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     >
   ) => {
-    const { name, value } = e.target
-    setForm((prev) => ({ ...prev, [name]: value }))
-  }
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
 
   const handleDamageFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const files = e.target.files
-  if (!files) return
+    const files = e.target.files;
+    if (!files) return;
 
-  // แปลง FileList → File[] ก่อน
-  const newFiles = Array.from(files)
+    // แปลง FileList → File[] ก่อน
+    const newFiles = Array.from(files);
 
-  // แล้วสะสมเข้า state
-  setDamageFiles(prev => [...prev, ...newFiles])
-}
+    // แล้วสะสมเข้า state
+    setDamageFiles((prev) => [...prev, ...newFiles]);
+  };
 
-const handleEstimateFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const files = e.target.files
-  if (!files) return
-  const newFiles = Array.from(files)
-  setEstimateFiles(prev => [...prev, ...newFiles])
-}
+  const handleEstimateFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    const newFiles = Array.from(files);
+    setEstimateFiles((prev) => [...prev, ...newFiles]);
+  };
 
-const handleOtherFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const files = e.target.files
-  if (!files) return
-  const newFiles = Array.from(files)
-  setOtherFiles(prev => [...prev, ...newFiles])
-}
+  const handleOtherFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    const newFiles = Array.from(files);
+    setOtherFiles((prev) => [...prev, ...newFiles]);
+  };
 
-   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSubmitting(true)
-    setError(null)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
     try {
-      const data = new FormData()
-      // append form fields
-      Object.entries(form).forEach(([k,v]) => data.append(k, v as string))
-      // append dynamic damageOwn
-      data.append('damageOwnType', damageOwnType)
-      if (damageOwnType === 'other') data.append('damageOtherOwn', damageOtherOwn)
-      // append files
-      damageFiles.forEach(f => data.append('damageFiles', f))
-      estimateFiles.forEach(f => data.append('estimateFiles', f))
-      otherFiles.forEach(f => data.append('otherFiles', f))
+      const data = new FormData();
+      Object.entries(form).forEach(([k, v]) => data.append(k, v as string));
+      damageFiles.forEach((f) => data.append("damageFiles", f));
+      estimateFiles.forEach((f) => data.append("estimateFiles", f));
+      otherFiles.forEach((f) => data.append("otherFiles", f));
 
-      const res = await fetch('/api/claims', { method:'POST', body:data })
-      if (!res.ok) throw new Error(await res.text())
-      router.push('/claims')
+      const res = await fetch(`${API}/api/claims`, {
+        method: "POST",
+        credentials: "include",
+        body: data,
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "สร้างเคลมไม่สำเร็จ");
+      router.push(`/claims/${json.claim.id}`);
     } catch (err: any) {
-      setError(err.message)
-      setSubmitting(false)
+      setError(err.message);
+      setSubmitting(false);
     }
-  }
+  };
 
-   const selectedApprover = approverList.find(a => a.id === form.approverId)
+  const selectedApprover = approverList.find((a) => a.id === form.approverId);
 
   // สร้าง preview URLs
-  
+
   return (
-     <div className="max-w-3xl mx-auto p-6">
+    <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-2xl mb-6">แจ้งอุบัติเหตุ</h1>
       <form onSubmit={handleSubmit} className="space-y-6">
-
         {/* เลือก Approver */}
         <div>
           <label className="block mb-1 font-medium">
@@ -118,7 +127,7 @@ const handleOtherFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
             className="w-full border p-2 rounded"
           >
             <option value="">-- เลือก --</option>
-            {approverList.map(a => (
+            {approverList.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
               </option>
@@ -133,9 +142,7 @@ const handleOtherFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
 
         {/* ลักษณะอุบัติเหตุ */}
         <fieldset className="border-t pt-4">
-          <legend className="font-medium">
-            1. ลักษณะอุบัติเหตุ
-          </legend>
+          <legend className="font-medium">1. ลักษณะอุบัติเหตุ</legend>
           <div className="grid grid-cols-2 gap-4 mt-3">
             <div>
               <label>
@@ -143,8 +150,8 @@ const handleOtherFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
               </label>
               <input
                 type="date"
-                name="date"
-                value={form.date}
+                name="accidentDate" // ชื่อตรงกับ state
+                value={form.accidentDate} // ตรงกับ key
                 onChange={handleChange}
                 required
                 className="w-full border p-2 rounded"
@@ -156,13 +163,14 @@ const handleOtherFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
               </label>
               <input
                 type="time"
-                name="time"
-                value={form.time}
+                name="accidentTime" // ชื่อตรงกับ state
+                value={form.accidentTime} // ตรงกับ key
                 onChange={handleChange}
                 required
                 className="w-full border p-2 rounded"
               />
             </div>
+
             <div className="col-span-2">
               <label>
                 ที่อยู่สถานที่เกิดเหตุ <span className="text-red-600">*</span>
@@ -198,7 +206,9 @@ const handleOtherFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
           </legend>
           <div className="grid grid-cols-2 gap-4 mt-3">
             <div>
-              <label>วันที่แจ้ง <span className="text-gray-500">(ถ้ามี)</span></label>
+              <label>
+                วันที่แจ้ง <span className="text-gray-500">(ถ้ามี)</span>
+              </label>
               <input
                 type="date"
                 name="policeDate"
@@ -241,8 +251,8 @@ const handleOtherFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
                 type="radio"
                 name="damageOwnType"
                 value="mitrphol"
-                checked={damageOwnType === 'mitrphol'}
-                onChange={() => setDamageOwnType('mitrphol')}
+                checked={damageOwnType === "mitrphol"}
+                onChange={() => setDamageOwnType("mitrphol")}
                 className="mr-2"
               />
               ทรัพย์สินของกลุ่มมิตรผล
@@ -252,8 +262,8 @@ const handleOtherFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
                 type="radio"
                 name="damageOwnType"
                 value="other"
-                checked={damageOwnType === 'other'}
-                onChange={() => setDamageOwnType('other')}
+                checked={damageOwnType === "other"}
+                onChange={() => setDamageOwnType("other")}
                 className="mr-2"
               />
               ทรัพย์สินของ
@@ -262,8 +272,8 @@ const handleOtherFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
               type="text"
               name="damageOtherOwn"
               value={damageOtherOwn}
-              onChange={e => setDamageOtherOwn(e.target.value)}
-              disabled={damageOwnType !== 'other'}
+              onChange={(e) => setDamageOtherOwn(e.target.value)}
+              disabled={damageOwnType !== "other"}
               placeholder="ระบุทรัพย์สิน"
               className="border p-2 rounded flex-1"
             />
@@ -288,7 +298,7 @@ const handleOtherFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
                 className="w-full border p-2 rounded"
               />
             </div>
-            
+
             <div>
               <label>รายละเอียดผู้เสียชีวิต/ผู้บาดเจ็บ (หากมี)</label>
               <textarea
@@ -302,46 +312,82 @@ const handleOtherFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
           </div>
         </fieldset>
 
-
         {/* 4. ความเสียหายคู่กรณี (หากมี) */}
         <fieldset className="border-t pt-6 space-y-4">
-          <legend className="font-medium">4. ความเสียหายของทรัพย์สินคู่กรณี (หากมี)</legend>
+          <legend className="font-medium">
+            4. ความเสียหายของทรัพย์สินคู่กรณี (หากมี)
+          </legend>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label>ชื่อ-นามสกุล (หรือชื่อบริษัท)</label>
-              <input type="text" name="partnerName" value={form.partnerName} onChange={handleChange} className="w-full border p-2 rounded" />
+              <input
+                type="text"
+                name="partnerName"
+                value={form.partnerName}
+                onChange={handleChange}
+                className="w-full border p-2 rounded"
+              />
             </div>
             <div>
               <label>เบอร์โทรศัพท์</label>
-              <input type="text" name="partnerPhone" value={form.partnerPhone} onChange={handleChange} className="w-full border p-2 rounded" />
+              <input
+                type="text"
+                name="partnerPhone"
+                value={form.partnerPhone}
+                onChange={handleChange}
+                className="w-full border p-2 rounded"
+              />
             </div>
             <div className="col-span-2">
               <label>ที่อยู่สถานที่เกิดเหตุ</label>
-              <input type="text" name="partnerLocation" value={form.partnerLocation} onChange={handleChange} className="w-full border p-2 rounded" />
+              <input
+                type="text"
+                name="partnerLocation"
+                value={form.partnerLocation}
+                onChange={handleChange}
+                className="w-full border p-2 rounded"
+              />
             </div>
             <div className="col-span-2">
               <label>รายละเอียดความเสียหายของทรัพย์สิน</label>
-              <textarea name="partnerDamageDetail" value={form.partnerDamageDetail} onChange={handleChange} className="w-full border p-2 rounded" />
+              <textarea
+                name="partnerDamageDetail"
+                value={form.partnerDamageDetail}
+                onChange={handleChange}
+                className="w-full border p-2 rounded"
+              />
             </div>
             <div>
               <label>มูลค่าโดยประมาณ</label>
-              <input type="number" name="partnerDamageAmount" value={form.partnerDamageAmount} onChange={handleChange} className="w-full border p-2 rounded" />
+              <input
+                type="number"
+                name="partnerDamageAmount"
+                value={form.partnerDamageAmount}
+                onChange={handleChange}
+                className="w-full border p-2 rounded"
+              />
             </div>
             <div>
               <label>รายละเอียดผู้เสียชีวิต/ผู้บาดเจ็บ (หากมี)</label>
-              <textarea name="partnerVictimDetail" value={form.partnerVictimDetail} onChange={handleChange} className="w-full border p-2 rounded" />
+              <textarea
+                name="partnerVictimDetail"
+                value={form.partnerVictimDetail}
+                onChange={handleChange}
+                className="w-full border p-2 rounded"
+              />
             </div>
           </div>
         </fieldset>
 
         {/* แนบเอกสาร */}
-       <fieldset className="border-t pt-6 space-y-6">
+        <fieldset className="border-t pt-6 space-y-6">
           <legend className="font-semibold text-lg">แนบเอกสารตามรายการ</legend>
 
           {/* 1) รูปภาพความเสียหาย */}
           <div>
             <label className="block mb-2 font-medium">
-              1) รูปภาพความเสียหาย <span className="text-red-600">*</span> (jpeg/jpg/png/pdf)
+              1) รูปภาพความเสียหาย <span className="text-red-600">*</span>{" "}
+              (jpeg/jpg/png/pdf)
             </label>
             <label
               htmlFor="damageFiles"
@@ -374,7 +420,7 @@ const handleOtherFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
             </label>
             {damageFiles.length > 0 && (
               <ul className="mt-4 space-y-2">
-                {damageFiles.map(f => (
+                {damageFiles.map((f) => (
                   <li key={f.name} className="flex items-center text-sm">
                     📎
                     <a
@@ -394,7 +440,8 @@ const handleOtherFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
           {/* 2) เอกสารสำรวจความเสียหาย */}
           <div>
             <label className="block mb-2 font-medium">
-              2) เอกสารสำรวจความเสียหาย <span className="text-red-600">*</span> (jpeg/jpg/png/pdf)
+              2) เอกสารสำรวจความเสียหาย <span className="text-red-600">*</span>{" "}
+              (jpeg/jpg/png/pdf)
             </label>
             <label
               htmlFor="estimateFiles"
@@ -427,7 +474,7 @@ const handleOtherFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
             </label>
             {estimateFiles.length > 0 && (
               <ul className="mt-2 text-sm text-gray-700 space-y-1">
-                {estimateFiles.map(f => (
+                {estimateFiles.map((f) => (
                   <li key={f.name} className="flex items-center">
                     📎
                     <a
@@ -480,7 +527,7 @@ const handleOtherFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
             </label>
             {otherFiles.length > 0 && (
               <ul className="mt-2 text-sm text-gray-700 space-y-1">
-                {otherFiles.map(f => (
+                {otherFiles.map((f) => (
                   <li key={f.name} className="flex items-center">
                     📎
                     <a
@@ -504,7 +551,9 @@ const handleOtherFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
           disabled={submitting}
           className="bg-blue-600 text-white px-4 py-2 rounded"
         >
-          {submitting ? 'กำลังส่ง...' : 'Submit'}
+          {submitting ? "กำลังส่ง..." : "Submit"}
         </button>
       </form>
-    </div>)}
+    </div>
+  );
+}

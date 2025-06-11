@@ -1,3 +1,4 @@
+// app/api/auth/[...nextauth]/route.ts
 import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import type { NextAuthOptions } from 'next-auth'
@@ -11,40 +12,39 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        try {
-          const res = await fetch(
-            `${process.env.NEXTAUTH_URL}/api/auth/login`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                username: credentials!.username,
-                password: credentials!.password,
-              }),
-            }
-          )
+        if (!credentials) return null
 
-          // ถ้าไม่ ok ให้อ่าน text และโยนเป็น Error
-          if (!res.ok) {
-            const errorText = await res.text()
-            throw new Error(errorText)
+        // POST to Express backend at localhost:5000
+        const res = await fetch(
+          `${process.env.NEXTAUTH_URL}/api/auth/login`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: credentials.username,
+              password: credentials.password,
+            }),
           }
-
-          const data = await res.json() // ตอนนี้แน่ใจว่าคือ JSON
-          return { ...data.user, accessToken: data.token }
-        } catch (err: any) {
-          console.error('Authorize failed:', err)
-          // NextAuth จะส่ง err.message กลับไปให้ signIn
-          throw new Error(err.message || 'Cannot authenticate')
+        )
+        if (!res.ok) {
+          // invalid credentials
+          return null
         }
+        const data = await res.json()
+        // return user + token to be stored in JWT
+        return { ...data.user, accessToken: data.token }
       },
     }),
   ],
+
   session: { strategy: 'jwt' },
   secret: process.env.NEXTAUTH_SECRET,
+
   callbacks: {
     async jwt({ token, user }) {
-      if (user) token.accessToken = (user as any).accessToken
+      if (user && (user as any).accessToken) {
+        token.accessToken = (user as any).accessToken
+      }
       return token
     },
     async session({ session, token }) {

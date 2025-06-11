@@ -1,32 +1,25 @@
-'use client'
-import { useState } from 'react'
-import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+"use client";
+import { useState } from "react";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-
-    // เรียก signIn แบบ non-redirect เพื่อเช็คผลก่อน
-    const res = await signIn('credentials', {
+    e.preventDefault();
+    setError(null);
+    const res = await signIn("credentials", {
       redirect: false,
       username,
       password,
-    })
-
-    if (res?.error) {
-      setError('ล็อกอินไม่สำเร็จ: ' + res.error)
-    } else {
-      // ล็อกอินสำเร็จ
-      router.push('/dashboard')
-    }
-  }
+    });
+    if (res?.error) setError(res.error);
+    else router.push("/dashboard");
+  };
 
   return (
     <div className="p-8 max-w-md mx-auto">
@@ -36,7 +29,7 @@ export default function LoginPage() {
           type="text"
           placeholder="Username"
           value={username}
-          onChange={e => setUsername(e.target.value)}
+          onChange={(e) => setUsername(e.target.value)}
           className="w-full p-2 border rounded"
           required
         />
@@ -44,13 +37,11 @@ export default function LoginPage() {
           type="password"
           placeholder="Password"
           value={password}
-          onChange={e => setPassword(e.target.value)}
+          onChange={(e) => setPassword(e.target.value)}
           className="w-full p-2 border rounded"
           required
         />
-        {error && (
-          <p className="text-red-600 text-sm">{error}</p>
-        )}
+        {error && <p className="text-red-600">{error}</p>}
         <button
           type="submit"
           className="w-full p-2 bg-blue-600 text-white rounded"
@@ -59,5 +50,5 @@ export default function LoginPage() {
         </button>
       </form>
     </div>
-  )
+  );
 }
