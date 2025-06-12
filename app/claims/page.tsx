@@ -1,67 +1,110 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 interface Claim {
   id: string
-  cause: string
   status: string
-  submittedAt: string
   createdAt: string
-  updatedAt: string
+  submittedAt: string | null
 }
 
-const API = process.env.NEXT_PUBLIC_BACKEND_URL!
-
-export default function ClaimListPage() {
-  const [claims, setClaims] = useState<Claim[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+export default function ClaimsPage() {
+  const { data: session, status } = useSession()
+  const [claims,   setClaims]  = useState<Claim[]>([])
+  const [loading,  setLoading] = useState(true)
+  const [error,    setError]   = useState<string|null>(null)
 
   useEffect(() => {
-    fetch(`${API}/api/claims`, {
-      method: 'GET',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('ไม่สามารถดึงข้อมูลเคลมได้')
-        return res.json()
-      })
-      .then(data => setClaims(data.claims))
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [])
+    // only run once we know we’re logged in
+    if (status !== 'authenticated') return
+    //console.log('SESSION.USER:', session?.user)
+    //console.log('ABOUT TO SEND HEADER:', session?.user.accessToken);
+    (async () => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_COMPANY_API_URL}/api/claims`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              // ← Make sure this is exactly session.user.accessToken
+              Authorization: `Bearer ${session!.user.accessToken}`,
+            },
+          }
+        )
+        if (!res.ok) {
+          // capture the JSON error message
+          const body = await res.json()
+          throw new Error(body.message || res.statusText)
+        }
+        const { claims } = await res.json()
+        setClaims(claims)
+      } catch (err: any) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [status, session])
 
-  if (loading) return <p>กำลังโหลด...</p>
-  if (error) return <p className="text-red-600">Error: {error}</p>
+  if (status === 'loading')      return <p>Loading session…</p>
+  if (status === 'unauthenticated')
+    return <p>Please <Link href="/login">login</Link> first.</p>
+  if (loading)                    return <p>Loading your claims…</p>
+  if (error)                      return <p className="text-red-600">Error loading claims: {error}</p>
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl mb-4">รายการเคลม</h1>
-      <Link href="/claims/new">
-        <a className="mb-4 inline-block bg-green-600 text-white px-4 py-2 rounded">
-          แจ้งเคลมใหม่
-        </a>
-      </Link>
-      <ul className="space-y-4">
-        {claims.map(c => (
-          <li key={c.id} className="p-4 border rounded flex justify-between">
-            <div>
-              <p><strong>Claim #{c.id}</strong></p>
-              <p>สาเหตุ: {c.cause}</p>
-              <p>สถานะ: {c.status}</p>
-              <p>ส่งเมื่อ: {new Date(c.submittedAt).toLocaleString()}</p>
-              <p>สร้างเมื่อ: {new Date(c.createdAt).toLocaleString()}</p>
-              <p>อัปเดตเมื่อ: {new Date(c.updatedAt).toLocaleString()}</p>
-            </div>
-            <Link href={`/claims/${c.id}`}>
-              <a className="text-blue-600">ดูรายละเอียด</a>
-            </Link>
-          </li>
-        ))}
-      </ul>
+    <div className="max-w-4xl mx-auto p-6">
+      <header className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-semibold">รายการเคลม</h1>
+        <Link
+          href="/claims/new"
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+        >
+          + สร้างเคลมใหม่
+        </Link>
+      </header>
+
+      {claims.length === 0 ? (
+        <p>ยังไม่มีรายการเคลม</p>
+      ) : (
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="border px-4 py-2 text-left">ID</th>
+              <th className="border px-4 py-2 text-left">สถานะ</th>
+              <th className="border px-4 py-2 text-left">สร้างเมื่อ</th>
+              <th className="border px-4 py-2 text-left">ส่งเมื่อ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {claims.map((c) => (
+              <tr key={c.id} className="hover:bg-gray-50">
+                <td className="border px-4 py-2">
+                  <Link
+                    href={`/claims/${c.id}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    {c.id}
+                  </Link>
+                </td>
+                <td className="border px-4 py-2">{c.status}</td>
+                <td className="border px-4 py-2">
+                  {new Date(c.createdAt).toLocaleString()}
+                </td>
+                <td className="border px-4 py-2">
+                  {c.submittedAt
+                    ? new Date(c.submittedAt).toLocaleString()
+                    : '-'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   )
 }

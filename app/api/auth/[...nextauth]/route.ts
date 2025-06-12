@@ -6,49 +6,59 @@ import type { NextAuthOptions } from 'next-auth'
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
-      name: 'CompanyAPI',
+      name: 'CompanyLogin',
       credentials: {
-        username: { label: 'Username', type: 'text' },
+        email:    { label: 'Email',    type: 'text' },
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
         if (!credentials) return null
 
-        // POST to Express backend at localhost:5000
         const res = await fetch(
-          `${process.env.NEXTAUTH_URL}/api/auth/login`,
+          // ◀️ USE your Express URL, not NEXTAUTH_URL
+          `${process.env.NEXT_PUBLIC_COMPANY_API_URL}/api/auth/login`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              username: credentials.username,
+              email:    credentials.email,
               password: credentials.password,
             }),
           }
         )
-        if (!res.ok) {
-          // invalid credentials
-          return null
+
+        if (!res.ok) return null
+        const { user, token } = await res.json()
+
+        // return an object that includes the JWT
+        return {
+          id:          user.id,
+          name:        user.name,
+          email:       user.email,
+          role:        user.role,
+          accessToken: token,
         }
-        const data = await res.json()
-        // return user + token to be stored in JWT
-        return { ...data.user, accessToken: data.token }
       },
     }),
   ],
 
   session: { strategy: 'jwt' },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret:  process.env.NEXTAUTH_SECRET,
 
   callbacks: {
     async jwt({ token, user }) {
-      if (user && (user as any).accessToken) {
+      if (user) {
         token.accessToken = (user as any).accessToken
+        token.role        = (user as any).role
       }
       return token
     },
     async session({ session, token }) {
-      session.user = { ...(session.user as any), ...token }
+      session.user = {
+        ...session.user,
+        accessToken: token.accessToken as string,
+        role:        token.role as string,
+      }
       return session
     },
   },
