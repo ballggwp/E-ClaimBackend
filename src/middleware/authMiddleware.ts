@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken'
 declare global {
   namespace Express {
     interface Request {
-      user?: { id: string; role: string }
+      user?: { id: string; role: string;name:string }
     }
   }
 }
@@ -18,7 +18,7 @@ const authMiddleware: RequestHandler = (req, res, next) => {
   }
   try {
     const payload = jwt.verify(header[1], process.env.JWT_SECRET!) as any
-    req.user = { id: payload.id, role: payload.role }
+    req.user = { id: payload.id, role: payload.role,name:payload.name }
     next()
   } catch {
     res.status(401).json({ message: 'Invalid token' })
