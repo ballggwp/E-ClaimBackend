@@ -10,6 +10,7 @@ declare module "next-auth" {
       accessToken?: string
       /** comes from `jwt.role` */
       role?: string
+      position?:string
     } & DefaultSession["user"]
   }
 
@@ -17,6 +18,7 @@ declare module "next-auth" {
   interface User extends DefaultUser {
     accessToken?: string
     role?: string
+    position?:string
   }
 }
 
@@ -24,5 +26,6 @@ declare module "next-auth/jwt" {
   interface JWT extends DefaultJWT {
     accessToken?: string
     role?: string
+    position?: string;
   }
 }

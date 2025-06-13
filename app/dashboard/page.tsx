@@ -29,7 +29,7 @@ export default function DashboardPage() {
     ;(async () => {
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_COMPANY_API_URL}/api/claims`,
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/claims`,
           {
             headers: {
               Authorization: `Bearer ${session!.user.accessToken}`,
@@ -77,7 +77,9 @@ export default function DashboardPage() {
               </tr>
             </thead>
             <tbody>
-  {claims.map(c => (
+  {claims
+  .filter(c => c.status === 'DRAFT')
+  .map(c => (
     <tr key={c.id} className="border-t">
       <td className="px-4 py-2">
         <Link href={`/claims/${c.id}`} className="text-blue-600 hover:underline">

@@ -7,7 +7,7 @@ import Link from 'next/link'
 interface Claim {
   id: string
   status: string
-  createdAt: string
+  createdAt: string | null
   submittedAt: string | null
 }
 
@@ -25,7 +25,7 @@ export default function ClaimsPage() {
     (async () => {
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_COMPANY_API_URL}/api/claims`,
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/claims`,
           {
             method: 'GET',
             headers: {
@@ -93,7 +93,9 @@ export default function ClaimsPage() {
                 </td>
                 <td className="border px-4 py-2">{c.status}</td>
                 <td className="border px-4 py-2">
-                  {new Date(c.createdAt).toLocaleString()}
+                  {c.createdAt
+                    ? new Date(c.createdAt).toLocaleString()
+                    : '-'}
                 </td>
                 <td className="border px-4 py-2">
                   {c.submittedAt
