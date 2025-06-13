@@ -12,6 +12,7 @@ export const listClaims: RequestHandler = async (req, res, next) => {
         id: true,
         status: true,
         submittedAt: true,
+        createdAt:   true,
         cause: true,
       },
       orderBy: { createdAt: "desc" },
@@ -51,7 +52,10 @@ export const createClaim: RequestHandler = async (req, res, next) => {
     const damageFiles = files?.damageFiles ?? [];
     const estimateFiles = files?.estimateFiles ?? [];
     const otherFiles = files?.otherFiles ?? [];
-
+    const accidentDate = b.accidentDate
+      ? new Date(b.accidentDate)
+      : new Date()
+    const accidentTime = b.accidentTime || ""
     const dfUrls = await Promise.all(damageFiles.map((f) => saveFile(f)));
     const efUrls = await Promise.all(estimateFiles.map((f) => saveFile(f)));
     const ofUrls = await Promise.all(otherFiles.map((f) => saveFile(f)));
@@ -73,8 +77,8 @@ export const createClaim: RequestHandler = async (req, res, next) => {
         submittedAt: saveAsDraft
           ? null
           : new Date(),
-        accidentDate: new Date(b.accidentDate),
-        accidentTime: b.accidentTime,
+        accidentDate,
+        accidentTime,
         location: b.location,
         cause: b.cause,
         policeDate: b.policeDate ? new Date(b.policeDate) : null,
@@ -124,25 +128,118 @@ export const createClaim: RequestHandler = async (req, res, next) => {
 
 export const getClaim: RequestHandler = async (req, res, next) => {
   try {
-    const claim = await prisma.claim.findUnique({
+    const raw = await prisma.claim.findUnique({
       where: { id: req.params.id },
       include: {
         createdBy: { select: { name: true } },
-        approver: { select: { name: true } },
+        approver:  { select: { name: true } },
         attachments: true,
-        fppa04: { include: { items: true } },
+        fppa04: {
+          include: { items: true }
+        },
       },
     });
-    if (!claim) {
+
+    if (!raw) {
       res.status(404).json({ message: "Claim not found" });
       return;
     }
 
-    res.json({
-      ...claim,
-      createdByName: claim.createdBy.name,
-      approverName: claim.approver.name,
+    // pull out the nested bits and flatten
+    const {
+      createdBy,
+      approver,
+      // everything else (accidentDate, location, etc)
+      ...rest
+    } = raw;
+
+    // Build the response object
+    const claim = {
+      ...rest,
+      createdByName: createdBy.name,
+      approverName:  approver.name,
+
+      // if you want, convert Date objects to ISO strings:
+      accidentDate:  rest.accidentDate.toISOString(),
+      // and similarly for policeDate, submittedAt, createdAt, etc:
+      policeDate:    rest.policeDate?.toISOString() ?? null,
+      submittedAt:   rest.submittedAt?.toISOString() ?? null,
+      createdAt:     rest.createdAt.toISOString(),
+      updatedAt:     rest.updatedAt.toISOString(),
+    };
+
+    res.json({ claim });
+  } catch (err) {
+    next(err);
+  }
+};
+export const updateClaim: RequestHandler = async (req, res, next) => {
+  try {
+    const claimId = req.params.id;
+    const b = req.body;
+    const saveAsDraft = b.saveAsDraft === 'true';
+
+    // fetch approver’s name (same as create)
+    const approver = await prisma.user.findUnique({
+      where: { id: b.approverId },
+      select: { name: true }
     });
+    if (!approver) {
+      res.status(400).json({ message: 'Invalid approverId' });
+      return;
+    }
+    const approverName = approver.name;
+    const createdByName = req.user!.name;
+
+    // handle new files
+    const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+    const damageFiles   = files?.damageFiles   ?? [];
+    const estimateFiles = files?.estimateFiles ?? [];
+    const otherFiles    = files?.otherFiles    ?? [];
+
+    const dfUrls = await Promise.all(damageFiles.map(f => saveFile(f)));
+    const efUrls = await Promise.all(estimateFiles.map(f => saveFile(f)));
+    const ofUrls = await Promise.all(otherFiles.map(f => saveFile(f)));
+
+    // perform the update
+    const updated = await prisma.claim.update({
+      where: { id: claimId },
+      data: {
+        approverId:    b.approverId,
+        approverName,
+        status:        saveAsDraft ? 'DRAFT' : 'PENDING_INSURER_REVIEW',
+        submittedAt:   saveAsDraft ? null : new Date(),
+        accidentDate:  new Date(b.accidentDate),
+        accidentTime:  b.accidentTime,
+        location:      b.location,
+        cause:         b.cause,
+        policeDate:    b.policeDate ? new Date(b.policeDate) : null,
+        policeTime:    b.policeTime,
+        policeStation: b.policeStation,
+        damageOwnType: b.damageOwnType,
+        damageOtherOwn:b.damageOtherOwn,
+        damageAmount:  b.damageAmount ? parseFloat(b.damageAmount) : null,
+        damageDetail:  b.damageDetail,
+        victimDetail:  b.victimDetail,
+        partnerName:         b.partnerName,
+        partnerPhone:        b.partnerPhone,
+        partnerLocation:     b.partnerLocation,
+        partnerDamageDetail: b.partnerDamageDetail,
+        partnerDamageAmount: b.partnerDamageAmount ? parseFloat(b.partnerDamageAmount) : null,
+        partnerVictimDetail: b.partnerVictimDetail,
+        // append any newly uploaded attachments
+        attachments: {
+          create: [
+            ...dfUrls.map(url => ({ type: AttachmentType.DAMAGE_IMAGE,   fileName: url.split('/').pop()!, url })),
+            ...efUrls.map(url => ({ type: AttachmentType.ESTIMATE_DOC,   fileName: url.split('/').pop()!, url })),
+            ...ofUrls.map(url => ({ type: AttachmentType.OTHER_DOCUMENT, fileName: url.split('/').pop()!, url })),
+          ]
+        }
+      },
+      include: { attachments: true }
+    });
+
+    res.json({ success: true, claim: updated });
   } catch (err) {
     next(err);
   }
