@@ -8,7 +8,7 @@ dotenv.config();
 const app = express();
 app.use(
   cors({
-    origin: 'http://localhost:3000',  
+    origin: process.env.FE_PORT,  
     credentials: true,     
     allowedHeaders: ["Authorization", "Content-Type"],           
   })
