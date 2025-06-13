@@ -11,32 +11,37 @@ interface Claim {
   submittedAt: string | null
 }
 
+const statusBadgeColor = (status: string) => {
+  switch (status) {
+    case "DRAFT": return "bg-gray-200 text-gray-700"
+    case "PENDING_INSURER_REVIEW": return "bg-yellow-100 text-yellow-800"
+    case "AWAITING_EVIDENCE": return "bg-orange-100 text-orange-800"
+    case "PENDING_MANAGER_REVIEW": return "bg-yellow-200 text-yellow-900"
+    case "PENDING_USER_CONFIRM": return "bg-purple-100 text-purple-800"
+    case "AWAITING_SIGNATURES": return "bg-blue-100 text-blue-800"
+    case "COMPLETED": return "bg-green-100 text-green-800"
+    case "REJECTED": return "bg-red-100 text-red-800"
+    default: return "bg-gray-100 text-gray-800"
+  }
+}
+
 export default function ClaimsPage() {
   const { data: session, status } = useSession()
-  const [claims,   setClaims]  = useState<Claim[]>([])
-  const [loading,  setLoading] = useState(true)
-  const [error,    setError]   = useState<string|null>(null)
+  const [claims, setClaims] = useState<Claim[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // only run once we know we’re logged in
     if (status !== 'authenticated') return
-    //console.log('SESSION.USER:', session?.user)
-    //console.log('ABOUT TO SEND HEADER:', session?.user.accessToken);
-    (async () => {
+    ;(async () => {
       try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/claims`,
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              // ← Make sure this is exactly session.user.accessToken
-              Authorization: `Bearer ${session!.user.accessToken}`,
-            },
-          }
-        )
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/claims`, {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session!.user.accessToken}`,
+          },
+        })
         if (!res.ok) {
-          // capture the JSON error message
           const body = await res.json()
           throw new Error(body.message || res.statusText)
         }
@@ -50,63 +55,67 @@ export default function ClaimsPage() {
     })()
   }, [status, session])
 
-  if (status === 'loading')      return <p>Loading session…</p>
-  if (status === 'unauthenticated')
-    return <p>Please <Link href="/login">login</Link> first.</p>
-  if (loading)                    return <p>Loading your claims…</p>
-  if (error)                      return <p className="text-red-600">Error loading claims: {error}</p>
+  if (status === 'loading') return <p className="p-6">Loading session…</p>
+  if (status === 'unauthenticated') return <p className="p-6">กรุณา <Link href="/login" className="text-blue-600 underline">เข้าสู่ระบบ</Link> ก่อน</p>
+  if (loading) return <p className="p-6">กำลังโหลดรายการเคลม…</p>
+  if (error) return <p className="text-red-600 p-6">เกิดข้อผิดพลาด: {error}</p>
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <header className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold">รายการเคลม</h1>
-        <Link
-          href="/claims/new"
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-        >
-          + สร้างเคลมใหม่
-        </Link>
-      </header>
+    <div className="min-h-screen bg-gray-50 py-10 px-6">
+      <div className="max-w-5xl mx-auto">
+        <header className="flex items-center justify-between mb-8">
+          <h1 className="text-3xl font-bold text-gray-800">รายการเคลม</h1>
+          <Link
+            href="/claims/new"
+            className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition"
+          >
+            + สร้างเคลมใหม่
+          </Link>
+        </header>
 
-      {claims.length === 0 ? (
-        <p>ยังไม่มีรายการเคลม</p>
-      ) : (
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="border px-4 py-2 text-left">ID</th>
-              <th className="border px-4 py-2 text-left">สถานะ</th>
-              <th className="border px-4 py-2 text-left">สร้างเมื่อ</th>
-              <th className="border px-4 py-2 text-left">ส่งเมื่อ</th>
-            </tr>
-          </thead>
-          <tbody>
-            {claims.map((c) => (
-              <tr key={c.id} className="hover:bg-gray-50">
-                <td className="border px-4 py-2">
-                  <Link
-                    href={`/claims/${c.id}`}
-                    className="text-blue-600 hover:underline"
-                  >
-                    {c.id}
-                  </Link>
-                </td>
-                <td className="border px-4 py-2">{c.status}</td>
-                <td className="border px-4 py-2">
-                  {c.createdAt
-                    ? new Date(c.createdAt).toLocaleString()
-                    : '-'}
-                </td>
-                <td className="border px-4 py-2">
-                  {c.submittedAt
-                    ? new Date(c.submittedAt).toLocaleString()
-                    : '-'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+        {claims.length === 0 ? (
+          <p className="text-gray-600">ยังไม่มีรายการเคลม</p>
+        ) : (
+          <div className="overflow-x-auto bg-white shadow rounded-xl">
+            <table className="min-w-full text-sm text-gray-700">
+              <thead className="bg-gray-100 text-left">
+                <tr>
+                  <th className="px-6 py-3 font-semibold">ID</th>
+                  <th className="px-6 py-3 font-semibold">สถานะ</th>
+                  <th className="px-6 py-3 font-semibold">สร้างเมื่อ</th>
+                  <th className="px-6 py-3 font-semibold">ส่งเมื่อ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {claims.map((c) => (
+                  <tr key={c.id} className="border-t hover:bg-gray-50 transition">
+                    <td className="px-6 py-3">
+                      <Link href={`/claims/${c.id}`} className="text-blue-600 hover:underline">
+                        {c.id}
+                      </Link>
+                    </td>
+                    <td className="px-6 py-3">
+                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusBadgeColor(c.status)}`}>
+                        {c.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3">
+                      {c.createdAt
+                        ? new Date(c.createdAt).toLocaleDateString('th-TH')
+                        : '-'}
+                    </td>
+                    <td className="px-6 py-3">
+                      {c.submittedAt
+                        ? new Date(c.submittedAt).toLocaleDateString('th-TH')
+                        : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

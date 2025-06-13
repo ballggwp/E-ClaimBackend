@@ -110,7 +110,7 @@ export function ClaimForm({
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-2xl mb-6">
+      <h1 className="text-3xl font-semibold text-gray-800 mb-8">
         {readOnly
           ? "เอกสารรอการดำเนินการ"
           : values.accidentDate
@@ -118,21 +118,19 @@ export function ClaimForm({
           : "New Claim"}
       </h1>
 
-      {error && <p className="text-red-600 mb-4">{error}</p>}
+      {error && <p className="text-red-600 mb-4 bg-red-50 border border-red-200 px-4 py-2 rounded">{error}</p>}
 
       <form className="space-y-6">
         {/* Approver */}
         <div>
-          <label className="block mb-1 font-medium">
+          <label className="block mb-1 font-semibold text-gray-700">
             เลือกผู้อนุมัติเอกสาร <span className="text-red-600">*</span>
           </label>
           <select
             name="approverId"
             value={values.approverId}
             onChange={onChange}
-           className={`w-full border p-2 rounded ${
-                  readOnly ? "bg-gray-100" : ""
-                }`}
+           className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
             disabled={readOnly}
           >
             <option value="">-- โปรดเลือก --</option>
@@ -158,9 +156,7 @@ export function ClaimForm({
                 name="accidentDate"
                 value={values.accidentDate}
                 onChange={onChange}
-                className={`w-full border p-2 rounded ${
-                  readOnly ? "bg-gray-100" : ""
-                }`}
+                className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
                 disabled={readOnly}
               />
             </div>
@@ -174,9 +170,7 @@ export function ClaimForm({
                 name="accidentTime"
                 value={values.accidentTime}
                 onChange={onChange}
-                className={`w-full border p-2 rounded ${
-                  readOnly ? "bg-gray-100" : ""
-                }`}
+                className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
                 disabled={readOnly}
               />
             </div>
@@ -190,9 +184,7 @@ export function ClaimForm({
                 name="location"
                 value={values.location}
                 onChange={onChange}
-                className={`w-full border p-2 rounded ${
-                  readOnly ? "bg-gray-100" : ""
-                }`}
+                className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
                 disabled={readOnly}
               />
             </div>
@@ -205,9 +197,7 @@ export function ClaimForm({
                 name="cause"
                 value={values.cause}
                 onChange={onChange}
-                className={`w-full border p-2 rounded ${
-                  readOnly ? "bg-gray-100" : ""
-                }`}
+                className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
                 disabled={readOnly}
               />
             </div>
@@ -228,9 +218,7 @@ export function ClaimForm({
                 value={values.policeDate}
                 onChange={onChange}
                 disabled={readOnly}
-                className={`w-full border p-2 rounded ${
-                  readOnly ? "bg-gray-100" : ""
-                }`}
+                className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
               />
             </div>
             <div>
@@ -241,9 +229,7 @@ export function ClaimForm({
                 value={values.policeTime}
                 onChange={onChange}
                 disabled={readOnly}
-                className={`w-full border p-2 rounded ${
-                  readOnly ? "bg-gray-100" : ""
-                }`}
+                className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
               />
             </div>
             <div className="col-span-2">
@@ -254,9 +240,7 @@ export function ClaimForm({
                 value={values.policeStation}
                 onChange={onChange}
                 disabled={readOnly}
-                className={`w-full border p-2 rounded ${
-                  readOnly ? "bg-gray-100" : ""
-                }`}
+                className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
               />
             </div>
           </div>
@@ -299,7 +283,7 @@ export function ClaimForm({
               onChange={onChange}
               disabled={readOnly}
               placeholder="ระบุทรัพย์สิน"
-              className="border p-2 rounded flex-1"
+              className="border border-gray-300 px-4 py-2 rounded-lg flex-1 bg-white shadow-sm focus:ring-2 focus:ring-blue-400 transition"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -310,9 +294,7 @@ export function ClaimForm({
                 value={values.damageDetail}
                 onChange={onChange}
                 disabled={readOnly}
-                className={`w-full border p-2 rounded ${
-                  readOnly ? "bg-gray-100" : ""
-                }`}
+                className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
               />
             </div>
             <div>
@@ -323,9 +305,7 @@ export function ClaimForm({
                 value={values.damageAmount}
                 onChange={onChange}
                 disabled={readOnly}
-                className={`w-full border p-2 rounded ${
-                  readOnly ? "bg-gray-100" : ""
-                }`}
+                className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
               />
             </div>
             <div>
@@ -335,9 +315,7 @@ export function ClaimForm({
                 value={values.victimDetail}
                 onChange={onChange}
                 disabled={readOnly}
-                className={`w-full border p-2 rounded ${
-                  readOnly ? "bg-gray-100" : ""
-                }`}
+                className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
               />
             </div>
           </div>
@@ -357,9 +335,7 @@ export function ClaimForm({
                 value={values.partnerName}
                 onChange={onChange}
                 disabled={readOnly}
-               className={`w-full border p-2 rounded ${
-                  readOnly ? "bg-gray-100" : ""
-                }`}
+               className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
               />
             </div>
             <div>
@@ -370,9 +346,7 @@ export function ClaimForm({
                 value={values.partnerPhone}
                 onChange={onChange}
                 disabled={readOnly}
-                className={`w-full border p-2 rounded ${
-                  readOnly ? "bg-gray-100" : ""
-                }`}
+                className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
               />
             </div>
             <div className="col-span-2">
@@ -383,9 +357,7 @@ export function ClaimForm({
                 value={values.partnerLocation}
                 onChange={onChange}
                 disabled={readOnly}
-                className={`w-full border p-2 rounded ${
-                  readOnly ? "bg-gray-100" : ""
-                }`}
+                className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
               />
             </div>
             <div className="col-span-2">
@@ -395,9 +367,7 @@ export function ClaimForm({
                 value={values.partnerDamageDetail}
                 onChange={onChange}
                 disabled={readOnly}
-                className={`w-full border p-2 rounded ${
-                  readOnly ? "bg-gray-100" : ""
-                }`}
+                className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
               />
             </div>
             <div>
@@ -408,9 +378,7 @@ export function ClaimForm({
                 value={values.partnerDamageAmount}
                 onChange={onChange}
                 disabled={readOnly}
-                className={`w-full border p-2 rounded ${
-                  readOnly ? "bg-gray-100" : ""
-                }`}
+                className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
               />
             </div>
             <div>
@@ -420,9 +388,7 @@ export function ClaimForm({
                 value={values.partnerVictimDetail}
                 onChange={onChange}
                 disabled={readOnly}
-                className={`w-full border p-2 rounded ${
-                  readOnly ? "bg-gray-100" : ""
-                }`}
+                className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
               />
             </div>
           </div>
@@ -449,7 +415,7 @@ export function ClaimForm({
                   </label>
                   <label
                     htmlFor={field}
-                    className="group flex flex-col items-center justify-center border-2 border-dashed border-gray-300 hover:border-blue-500 bg-gray-50 p-6 rounded-lg cursor-pointer transition-colors"
+                    className="group flex flex-col items-center justify-center border-2 border-dashed border-gray-300 hover:border-blue-500 bg-white p-6 rounded-xl shadow-sm cursor-pointer transition-all"
                   >
                     <svg
                       className="w-8 h-8 text-gray-400 group-hover:text-blue-500"
@@ -459,7 +425,7 @@ export function ClaimForm({
                     >
                       <path d="M12 4v16m8-8H4" strokeWidth={2} />
                     </svg>
-                    <span className="mt-2 text-gray-600 group-hover:text-blue-600">
+                    <span className="mt-2 text-gray-600 group-hover:text-blue-600 text-sm">
                       คลิกหรือวางไฟล์ที่นี่
                     </span>
                     <input
@@ -473,7 +439,7 @@ export function ClaimForm({
                     />
                   </label>
                   {files[field].length > 0 && (
-                    <ul className="mt-2 text-sm text-gray-700 space-y-1">
+                    <ul className="mt-2 text-sm text-gray-700 space-y-1 border-l-2 border-blue-200 pl-3">
                       {files[field].map((f) => (
                         <li key={f.name} className="flex items-center">
                           📎
@@ -490,7 +456,7 @@ export function ClaimForm({
 
         {/* Buttons */}
         {!readOnly && (
-          <div className="flex space-x-4">
+          <div className="flex space-x-4 pt-4">
             <button
               type="button"
               onClick={() => handleClick(true)}
@@ -505,7 +471,7 @@ export function ClaimForm({
               disabled={
                 submitting
               }
-              className="bg-blue-600 text-white px-4 py-2 rounded"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg shadow transition"
             >
               Submit
             </button>
@@ -513,7 +479,7 @@ export function ClaimForm({
         )}
 
         {readOnly && (
-          <p className="text-gray-600 italic">
+          <p className="text-gray-600 italic pt-6 text-sm">
             แบบฟอร์มนี้อยู่ในสถานะรอการดำเนินการ (view‐only)
           </p>
         )}

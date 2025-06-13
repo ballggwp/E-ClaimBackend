@@ -1,13 +1,14 @@
 'use client'
+
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
   const router = useRouter()
-  const [email,    setEmail]    = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error,    setError]    = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -25,32 +26,46 @@ export default function LoginPage() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-sm mx-auto p-6">
-      <h1 className="text-2xl mb-4">เข้าสู่ระบบ</h1>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-200">
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md"
+      >
+        <h1 className="text-3xl font-bold mb-6 text-center text-gray-700">เข้าสู่ระบบ</h1>
 
-      <label className="block mb-1">Email</label>
-      <input
-        type="email"
-        value={email}
-        onChange={e => setEmail(e.target.value)}
-        required
-        className="w-full border p-2 rounded mb-4"
-      />
+        <label className="block text-sm font-medium text-gray-600 mb-1">Email</label>
+        <input
+          type="email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          required
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          placeholder="you@example.com"
+        />
 
-      <label className="block mb-1">Password</label>
-      <input
-        type="password"
-        value={password}
-        onChange={e => setPassword(e.target.value)}
-        required
-        className="w-full border p-2 rounded mb-4"
-      />
+        <label className="block text-sm font-medium text-gray-600 mb-1">Password</label>
+        <input
+          type="password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          required
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          placeholder="••••••••"
+        />
 
-      {error && <p className="text-red-600 mb-2">{error}</p>}
+        {error && <p className="text-red-500 mb-4 text-sm text-center">{error}</p>}
 
-      <button type="submit" className="w-full bg-blue-600 text-white p-2 rounded">
-        เข้าสู่ระบบ
-      </button>
-    </form>
+        <button
+          type="submit"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold transition duration-200"
+        >
+          เข้าสู่ระบบ
+        </button>
+
+        <p className="text-xs text-center text-gray-400 mt-4">
+          ยังไม่มีบัญชี? <a href="#" className="text-blue-500 hover:underline">สมัครสมาชิก</a>
+        </p>
+      </form>
+    </div>
   )
 }
