@@ -8,13 +8,13 @@ export const login: RequestHandler = async (req, res, next) => {
   try {
     const { email, password } = req.body
     const user = await prisma.user.findUnique({ where: { email } })
-    // bad credentials → send 401 then exit
+    
     if (!user || !(await bcrypt.compare(password, user.password))) {
       res.status(401).json({ message: 'Invalid credentials' })
       return
     }
 
-    // good credentials → sign token and send
+   
     const token = jwt.sign(
       { id: user.id, role: user.role,name:user.name },
       process.env.JWT_SECRET!,
@@ -31,9 +31,9 @@ export const login: RequestHandler = async (req, res, next) => {
       },
       token,
     })
-    // no `return res.json(...)`
+    
   } catch (err) {
-    // pass errors to express error handler
+    
     next(err)
   }
 }
