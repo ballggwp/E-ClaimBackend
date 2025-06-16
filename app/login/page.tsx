@@ -6,31 +6,32 @@ import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState('')
+  const [email, setEmail]     = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError]     = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
     const res = await signIn('credentials', {
       redirect: false,
       email,
       password,
+      callbackUrl: '/dashboard',
     })
+
     if (res?.error) {
       setError(res.error)
-    } else {
-      router.push('/dashboard')
+    } else if (res?.url) {
+      router.push(res.url)
     }
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-200">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md"
-      >
+      <form onSubmit={handleSubmit}
+            className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
         <h1 className="text-3xl font-bold mb-6 text-center text-gray-700">เข้าสู่ระบบ</h1>
 
         <label className="block text-sm font-medium text-gray-600 mb-1">Email</label>
