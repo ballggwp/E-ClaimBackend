@@ -3,6 +3,7 @@
 
 import React, { ChangeEvent } from "react";
 import Swal from "sweetalert2";
+
 //import { ClaimStatus, AttachmentType } from "@prisma/client";
 export interface User {
   id: string;
@@ -395,6 +396,7 @@ export function ClaimForm({
         </fieldset>
 
         {/* Attachments */}
+        {!readOnly && (
         <fieldset className="border-t pt-6 space-y-6">
           <legend className="font-semibold text-lg">แนบเอกสารตามรายการ</legend>
 
@@ -414,7 +416,7 @@ export function ClaimForm({
                     (jpeg/jpg/png/pdf)
                   </label>
                   <label
-                    htmlFor={field}
+                    htmlFor={field }
                     className="group flex flex-col items-center justify-center border-2 border-dashed border-gray-300 hover:border-blue-500 bg-white p-6 rounded-xl shadow-sm cursor-pointer transition-all"
                   >
                     <svg
@@ -422,6 +424,7 @@ export function ClaimForm({
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
+                      
                     >
                       <path d="M12 4v16m8-8H4" strokeWidth={2} />
                     </svg>
@@ -453,6 +456,7 @@ export function ClaimForm({
             }
           )}
         </fieldset>
+        )}
 
         {/* Buttons */}
         {!readOnly && (
@@ -478,12 +482,9 @@ export function ClaimForm({
           </div>
         )}
 
-        {readOnly && (
-          <p className="text-gray-600 italic pt-6 text-sm">
-            แบบฟอร์มนี้อยู่ในสถานะรอการดำเนินการ (view‐only)
-          </p>
-        )}
+        
       </form>
+      
     </div>
   );
 }

@@ -6,10 +6,17 @@ import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { ClaimForm, ClaimFormValues, User } from '@/components/ClaimForm'
 
+interface Attachment {
+  id: string
+  fileName: string
+  url: string
+  type: 'DAMAGE_IMAGE' | 'ESTIMATE_DOC' | 'OTHER_DOCUMENT'
+  createdAt?: string
+}
+
 interface ClaimPayload {
   id: string
   status: string
-  // … all the other fields you need …
   approverId: string
   accidentDate: string
   accidentTime: string
@@ -29,14 +36,15 @@ interface ClaimPayload {
   partnerDamageDetail: string
   partnerDamageAmount: string
   partnerVictimDetail: string
+  attachments: Attachment[]
 }
 
-export default function EditClaimPage() {
+export default function ClaimDetailPage() {
   const { id } = useParams()
   const router = useRouter()
   const { data: session, status } = useSession()
+
   const [claim, setClaim] = useState<ClaimPayload | null>(null)
-  const [approvers, setApprovers] = useState<User[]>([])
   const [values, setValues] = useState<ClaimFormValues>({
     approverId: '',
     accidentDate: '',
@@ -64,18 +72,20 @@ export default function EditClaimPage() {
     otherFiles: [] as File[],
   })
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [actionLoading, setActionLoading] = useState(false)
 
-  // fetch the existing claim
+  const isInsurer = session?.user.role === 'INSURANCE'
+
+  // Fetch claim details once
   useEffect(() => {
     if (status !== 'authenticated') return
-    fetch(`${process.env.NEXT_PUBLIC_COMPANY_API_URL}/api/claims/${id}`, {
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/claims/${id}`, {
       headers: { Authorization: `Bearer ${session!.user.accessToken}` },
     })
-      .then(r => r.json())
+      .then(res => res.json())
       .then((data: { claim: ClaimPayload }) => {
         setClaim(data.claim)
-        // seed values into the form
+        // Seed form values
         setValues({
           approverId: data.claim.approverId,
           accidentDate: data.claim.accidentDate.slice(0,10),
@@ -99,79 +109,211 @@ export default function EditClaimPage() {
         })
       })
       .catch(console.error)
-  }, [status, id])
+  }, [status, id, session])
 
-  // fetch approvers same as New page
+  // Approvers list state
+  const [approvers, setApprovers] = useState<User[]>([])
+
+  // Fetch approvers list
   useEffect(() => {
     if (status !== 'authenticated') return
-    fetch(`${process.env.NEXT_PUBLIC_COMPANY_API_URL}/api/users`, {
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users`, {
       headers: { Authorization: `Bearer ${session!.user.accessToken}` },
     })
-      .then(r => r.json())
+      .then(res => res.json())
       .then(data => setApprovers(data.users))
       .catch(console.error)
-  }, [status])
+  }, [status, session])
 
-  if (!claim) return <p>Loading…</p>
+  if (!claim) return <p className="p-6">Loading…</p>
 
-  // **only** lock the form when status is NOT DRAFT
-  const readOnly = claim.status !== 'DRAFT'
+  // Editable only when status is DRAFT or Pending insurer review
+  const readOnly = claim.status !== 'DRAFT' && claim.status !== 'PENDING_INSURER_REVIEW'
 
+  // Handle file selection
+  const handleFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: keyof typeof files
+  ) => {
+    if (!e.target.files) return
+    setFiles(prev => ({
+      ...prev,
+      [field]: [...prev[field], ...Array.from(e.target.files!)],
+    }))
+  }
+
+  // Handle form submission (update)
   const handleSubmit = async (
     vals: ClaimFormValues,
     f: typeof files,
     saveAsDraft: boolean
   ) => {
     setSubmitting(true)
-    setError(null)
     try {
-      const formData = new FormData()
-      formData.set('saveAsDraft', saveAsDraft.toString())
-      formData.set('approverId', vals.approverId)
-      Object.entries(vals).forEach(([k, v]) => {
-        if (k !== 'approverId') formData.set(k, v as string)
-      })
-      f.damageFiles.forEach(f => formData.append('damageFiles', f))
-      f.estimateFiles.forEach(f => formData.append('estimateFiles', f))
-      f.otherFiles.forEach(f => formData.append('otherFiles', f))
+      const fd = new FormData()
+      fd.set('saveAsDraft', saveAsDraft.toString())
+      fd.set('approverId', vals.approverId)
+      Object.entries(vals).forEach(([k, v]) => k !== 'approverId' && fd.set(k, v as string))
+      f.damageFiles.forEach(file => fd.append('damageFiles', file))
+      f.estimateFiles.forEach(file => fd.append('estimateFiles', file))
+      f.otherFiles.forEach(file => fd.append('otherFiles', file))
 
-      // **PUT** when editing existing claim
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_COMPANY_API_URL}/api/claims/${id}`,
-        {
-          method: 'PUT',
-          headers: {
-            Authorization: `Bearer ${session!.user.accessToken}`,
-          },
-          body: formData,
-        }
-      )
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/claims/${id}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${session!.user.accessToken}` },
+        body: fd,
+      })
       if (!res.ok) throw new Error(await res.text())
       router.push('/claims')
-    } catch (e: any) {
-      setError(e.message)
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
       setSubmitting(false)
     }
   }
 
+  // Handle insurer actions
+  const handleAction = async (action: 'approve' | 'reject' | 'request_evidence') => {
+    setActionLoading(true)
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/claims/${id}/action`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session!.user.accessToken}`,
+          },
+          body: JSON.stringify({ action }),
+        }
+      )
+      if (!res.ok) throw new Error(await res.text())
+      const data = await res.json()
+      setClaim(data.claim)
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  // Map field to attachment type
+  const typeMap = {
+    damageFiles: 'DAMAGE_IMAGE',
+    estimateFiles: 'ESTIMATE_DOC',
+    otherFiles: 'OTHER_DOCUMENT',
+  } as const
+
   return (
-    <ClaimForm
-      values={values}
-      files={files}
-      onChange={e =>
-        setValues(v => ({ ...v, [e.target.name]: e.target.value }))
-      }
-      onFileChange={(e, field) =>
-        setFiles(f => ({
-          ...f,
-          [field]: [...f[field], ...Array.from(e.target.files!)]
-        }))
-      }
-      onSubmit={handleSubmit}
-      approverList={approvers}
-      submitting={submitting}
-      error={error}
-      readOnly={readOnly}
-    />
+    <div className="max-w-3xl mx-auto py-10 space-y-8">
+      {/* Form Section */}
+      <ClaimForm
+        values={values}
+        files={files}
+        onChange={(e: { target: { name: any; value: any } }) => setValues((v: any) => ({ ...v, [e.target.name]: e.target.value }))}
+        onFileChange={handleFileChange}
+        onSubmit={handleSubmit}
+        approverList={approvers}
+        submitting={submitting}
+        error={null}
+        readOnly={readOnly}
+      />
+
+      {readOnly && (
+        <section className="pt-6 border-t space-y-10">
+          <h2 className="text-2xl font-bold">ไฟล์แนบ</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* รูปภาพความเสียหาย */}
+            <div>
+              <h3 className="text-lg font-semibold mb-4">รูปภาพความเสียหาย</h3>
+              <div className="grid grid-cols-1 gap-4">
+                {claim.attachments.filter(a => a.type === 'DAMAGE_IMAGE').map(att => (
+                  <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-lg shadow hover:shadow-lg transition">
+                    <div className="h-40 bg-gray-100 flex items-center justify-center">
+                      {/\.(jpe?g|png)$/i.test(att.url) ? (
+                        <img src={att.url} alt={att.fileName} className="object-cover h-full w-full" />
+                      ) : (
+                        <span className="text-6xl text-gray-400">📄</span>
+                      )}
+                    </div>
+                    <p className="mt-2 px-2 py-1 text-sm text-gray-700 truncate bg-white border-t">{att.fileName}</p>
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            {/* เอกสารสำรวจความเสียหาย */}
+            <div>
+              <h3 className="text-lg font-semibold mb-4">เอกสารสำรวจความเสียหาย</h3>
+              <div className="grid grid-cols-1 gap-4">
+                {claim.attachments.filter(a => a.type === 'ESTIMATE_DOC').map(att => (
+                  <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-lg shadow hover:shadow-lg transition">
+                    <div className="h-40 bg-gray-100 flex items-center justify-center">
+                      {/\.(jpe?g|png)$/i.test(att.url) ? (
+                        <img src={att.url} alt={att.fileName} className="object-cover h-full w-full" />
+                      ) : (
+                        <span className="text-6xl text-gray-400">📄</span>
+                      )}
+                    </div>
+                    <p className="mt-2 px-2 py-1 text-sm text-gray-700 truncate bg-white border-t">{att.fileName}</p>
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            {/* เอกสารเพิ่มเติมอื่น ๆ */}
+            <div>
+              <h3 className="text-lg font-semibold mb-4">เอกสารเพิ่มเติมอื่น ๆ</h3>
+              <div className="grid grid-cols-1 gap-4">
+                {claim.attachments.filter(a => a.type === 'OTHER_DOCUMENT').map(att => (
+                  <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-lg shadow hover:shadow-lg transition">
+                    <div className="h-40 bg-gray-100 flex items-center justify-center">
+                      {/\.(jpe?g|png)$/i.test(att.url) ? (
+                        <img src={att.url} alt={att.fileName} className="object-cover h-full w-full" />
+                      ) : (
+                        <span className="text-6xl text-gray-400">📄</span>
+                      )}
+                    </div>
+                    <p className="mt-2 px-2 py-1 text-sm text-gray-700 truncate bg-white border-t">{att.fileName}</p>
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Insurer Action Buttons */}
+      {isInsurer && claim.status === 'PENDING_INSURER_REVIEW' && (
+        <div className="flex space-x-4">
+          <button
+            onClick={() => handleAction('approve')}
+            disabled={actionLoading}
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded"
+          >
+            Approve
+          </button>
+          <button
+            onClick={() => handleAction('reject')}
+            disabled={actionLoading}
+            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded"
+          >
+            Reject
+          </button>
+          <button
+            onClick={() => handleAction('request_evidence')}
+            disabled={actionLoading}
+            className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded"
+          >
+            Request Evidence
+          </button>
+        </div>
+      )}
+      {readOnly && (
+          <p className="text-gray-600 italic pt-6 text-sm">
+            แบบฟอร์มนี้อยู่ในสถานะรอการดำเนินการ (view‐only)
+          </p>
+        )}
+    </div>
   )
 }
