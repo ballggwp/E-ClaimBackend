@@ -9,16 +9,20 @@ export const login: RequestHandler = async (req, res, next) => {
     const { email, password } = req.body
     const user = await prisma.user.findUnique({ where: { email } })
     
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-      res.status(401).json({ message: 'Invalid credentials' })
-      return
+    if (!user) {
+      res.status(400).json({ message: "User not found" });
+      return;
+    }
+    if (!(await bcrypt.compare(password, user.password))) {
+      res.status(400).json({ message: "email or password is incorrect" });
+      return;
     }
 
    
     const token = jwt.sign(
       { id: user.id, role: user.role,name:user.name },
       process.env.JWT_SECRET!,
-      { expiresIn: '8h' }
+      { expiresIn: '1h' }
     )
 
     res.json({
@@ -30,7 +34,8 @@ export const login: RequestHandler = async (req, res, next) => {
         position : user.position
       },
       token,
-    })
+    });
+    return;
     
   } catch (err) {
     
@@ -85,7 +90,7 @@ export const register: RequestHandler = async (req, res, next) => {
     const token = jwt.sign(
       { id: user.id, role: user.role },
       process.env.JWT_SECRET!,
-      { expiresIn: '8h' }
+      { expiresIn: '1h' }
     )
 
     // Send the response (don't `return res.json`)

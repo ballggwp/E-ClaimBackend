@@ -1,6 +1,6 @@
 import { Router }   from 'express'
 import authMiddleware from '../middleware/authMiddleware'
-import { listClaims, createClaim,getClaim,updateClaim } from '../controllers/claimController'
+import { listClaims, createClaim,getClaim,updateClaim,claimAction } from '../controllers/claimController'
 import multer from 'multer'
 
 const upload = multer({ dest: 'temp/' })
@@ -24,5 +24,6 @@ router.post(
   ]),
   createClaim
 )
+router.post("/:id/action", claimAction);
 
 export default router

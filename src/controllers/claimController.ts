@@ -2,24 +2,42 @@
 import type { RequestHandler } from "express";
 import prisma from "../lib/prisma";
 import { saveFile } from "../services/fileService";
-import { AttachmentType } from "@prisma/client";
+import { AttachmentType, ClaimStatus, Prisma } from "@prisma/client";
 
 export const listClaims: RequestHandler = async (req, res, next) => {
   try {
+    if (!req.user) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const isInsurer = req.user.role === "INSURANCE";
+
+    // build a WHERE that
+    // ─ if INSURANCE → exclude DRAFT and exclude claims *created by* INSURANCE
+    // ─ otherwise → only your own claims
+    const where: Prisma.ClaimWhereInput = isInsurer
+      ? {
+          status:        { not: "DRAFT" },
+          createdBy:     { role: { not: "INSURANCE" } },
+        }
+      : {
+          createdById:   req.user.id,
+        };
+
     const raw = await prisma.claim.findMany({
-      where: { createdById: req.user!.id },
+      where,
       select: {
-        id: true,
-        status: true,
+        id:          true,
+        status:      true,
         submittedAt: true,
         createdAt:   true,
-        cause: true,
+        cause:       true,
       },
       orderBy: { createdAt: "desc" },
     });
-
-    // nothing fancy—just send it straight back
     res.json({ claims: raw });
+    return;
   } catch (err) {
     next(err);
   }
@@ -240,6 +258,50 @@ export const updateClaim: RequestHandler = async (req, res, next) => {
     });
 
     res.json({ success: true, claim: updated });
+  } catch (err) {
+    next(err);
+  }
+  
+};
+export const claimAction: RequestHandler = async (req, res, next) => {
+  try {
+    const user = req.user!;
+    if (user.role !== "INSURANCE") {
+      res.status(403).json({ message: "Forbidden" });
+      return;  // <— stop here, but don't return res.json itself
+    }
+
+    const { id } = req.params;
+    const { action } = req.body as { action?: string };
+
+    if (!action) {
+      res.status(400).json({ message: "Missing action" });
+      return;
+    }
+
+    let newStatus: ClaimStatus;
+    switch (action) {
+      case "approve":
+        newStatus = ClaimStatus.PENDING_INSURER_FORM;
+        break;
+      case "reject":
+        newStatus = ClaimStatus.REJECTED;
+        break;
+      case "request_evidence":
+        newStatus = ClaimStatus.AWAITING_EVIDENCE;
+        break;
+      default:
+        res.status(400).json({ message: "Unknown action" });
+        return;
+    }
+
+    const updated = await prisma.claim.update({
+      where: { id },
+      data: { status: newStatus },
+    });
+
+    res.json({ claim: updated });
+    return;  // <— again, don’t return the call, just return void
   } catch (err) {
     next(err);
   }
