@@ -22,7 +22,7 @@ export const login: RequestHandler = async (req, res, next) => {
     const token = jwt.sign(
       { id: user.id, role: user.role,name:user.name },
       process.env.JWT_SECRET!,
-      { expiresIn: '1h' }
+      { expiresIn: '8h' }
     )
 
     res.json({
@@ -90,7 +90,7 @@ export const register: RequestHandler = async (req, res, next) => {
     const token = jwt.sign(
       { id: user.id, role: user.role },
       process.env.JWT_SECRET!,
-      { expiresIn: '1h' }
+      { expiresIn: '8h' }
     )
 
     // Send the response (don't `return res.json`)

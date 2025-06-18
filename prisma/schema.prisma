@@ -69,6 +69,7 @@ model Claim {
   approver         User         @relation("ClaimsApprover", fields: [approverId], references: [id])
 
   status           ClaimStatus  @default(DRAFT)
+  insurerComment   String?
   submittedAt      DateTime?
 
   accidentDate     DateTime
@@ -114,35 +115,45 @@ model Attachment {
 }
 
 model Fppa04 {
-  id                String              @id @default(cuid())
-  claimId           String              @unique
-  claim             Claim               @relation(fields: [claimId], references: [id])
+  id                  String                @id @default(cuid())
+  claimId             String                @unique
+  claim               Claim                 @relation(fields: [claimId], references: [id])
 
-  eventType         String
-  claimRefNumber    String
-  eventDescription  String
-  productionYear    Int
-  accidentDate      DateTime
-  reportedDate      DateTime
-  receivedDocDate   DateTime
-  company           String
-  factory           String
-  surveyorRefNumber String
+  eventType           String                // ประเภทกรมธรรม์
+  claimRefNumber      String                // หมายเลขรับ Claim
+  eventDescription    String                // เหตุการณ์
+  productionYear      Int                   // ปีรถที่ผลิต
+  accidentDate        DateTime              // วันที่เกิดเหตุ
+  reportedDate        DateTime              // วันที่รับแจ้ง
+  receivedDocDate     DateTime              // วันที่ได้รับเอกสาร
+  company             String                // บริษัท
+  factory             String                // โรงงาน
+  policyNumber        String                // เลขที่กรมธรรม์
+  surveyorRefNumber   String                // เลขที่ Claim Surveyor
 
-  // one-to-many: this form → its items
-  items             Fppa04Item[]        @relation("Fppa04Items")
+  items               Fppa04Item[]          @relation("Fppa04Items")
+  adjustments         Fppa04Adjustment[]    @relation("Fppa04Adjustments")
+  signatureFiles      String[]              // เก็บเป็น array ของ URL
 
-  signatureFiles    String[]
-
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
 }
 
 model Fppa04Item {
-  id            String             @id @default(cuid())
-  fppa04Id      String
-  fppa04        Fppa04             @relation("Fppa04Items", fields: [fppa04Id], references: [id])
-  category      Fppa04ItemCategory
-  description   String
-  amount        Float
+  id          String  @id @default(cuid())
+  fppa04Id    String
+  fppa04      Fppa04  @relation("Fppa04Items", fields: [fppa04Id], references: [id])
+  category    String
+  description String
+  total       Float
+  exception   Float
+}
+
+model Fppa04Adjustment {
+  id          String  @id @default(cuid())
+  fppa04Id    String
+  fppa04      Fppa04  @relation("Fppa04Adjustments", fields: [fppa04Id], references: [id])
+  type        String  // "บวก" หรือ "หัก"
+  description String
+  amount      Float
 }

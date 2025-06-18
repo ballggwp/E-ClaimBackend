@@ -4,6 +4,8 @@ import dotenv from "dotenv";
 import usersRoutes from './routes/users'
 import authRoutes from "./routes/auth";
 import claimRoutes from "./routes/claims";
+import fppa04Routes from "./routes/fppa04"
+import authMiddleware from './middleware/authMiddleware'
 import path from "path"
 dotenv.config();
 const app = express();
@@ -14,6 +16,9 @@ app.use(
     allowedHeaders: ["Authorization", "Content-Type"],           
   })
 )
+
+// 2) Mount your FPPA04 API (guarded inside that router by ensureRole)
+app.use('/api/fppa04', fppa04Routes)
 app.use(express.json());
 app.use('/api/users', usersRoutes);
 app.use("/api/auth", authRoutes);

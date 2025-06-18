@@ -33,6 +33,8 @@ export const listClaims: RequestHandler = async (req, res, next) => {
         submittedAt: true,
         createdAt:   true,
         cause:       true,
+        insurerComment: true,
+        createdByName: true,
       },
       orderBy: { createdAt: "desc" },
     });
@@ -146,51 +148,73 @@ export const createClaim: RequestHandler = async (req, res, next) => {
 
 export const getClaim: RequestHandler = async (req, res, next) => {
   try {
+    const { id } = req.params
+
     const raw = await prisma.claim.findUnique({
-      where: { id: req.params.id },
+      where: { id },
       include: {
-        createdBy: { select: { name: true } },
-        approver:  { select: { name: true } },
+        createdBy:   { select: { name: true } },
+        approver:    { select: { name: true } },
         attachments: true,
-        fppa04: {
-          include: { items: true }
-        },
       },
-    });
+    })
 
     if (!raw) {
       res.status(404).json({ message: "Claim not found" });
       return;
     }
 
-    // pull out the nested bits and flatten
-    const {
-      createdBy,
-      approver,
-      // everything else (accidentDate, location, etc)
-      ...rest
-    } = raw;
-
-    // Build the response object
+    // Flatten and format
     const claim = {
-      ...rest,
-      createdByName: createdBy.name,
-      approverName:  approver.name,
+      id:              raw.id,
+      status:          raw.status,
+      approverId:      raw.approverId,
+      approverName:    raw.approver.name,
+      createdByName:   raw.createdBy.name,
+      insurerComment:  raw.insurerComment,
 
-      // if you want, convert Date objects to ISO strings:
-      accidentDate:  rest.accidentDate.toISOString(),
-      // and similarly for policeDate, submittedAt, createdAt, etc:
-      policeDate:    rest.policeDate?.toISOString() ?? null,
-      submittedAt:   rest.submittedAt?.toISOString() ?? null,
-      createdAt:     rest.createdAt.toISOString(),
-      updatedAt:     rest.updatedAt.toISOString(),
-    };
+      accidentDate:    raw.accidentDate.toISOString(),
+      accidentTime:    raw.accidentTime,
+      location:        raw.location,
+      cause:           raw.cause,
 
+      policeDate:      raw.policeDate?.toISOString()     ?? null,
+      policeTime:      raw.policeTime                     ?? null,
+      policeStation:   raw.policeStation                  ?? null,
+
+      damageOwnType:   raw.damageOwnType,
+      damageOtherOwn:  raw.damageOtherOwn,
+      damageDetail:    raw.damageDetail,
+      damageAmount:    raw.damageAmount?.toString()       ?? null,
+      victimDetail:    raw.victimDetail,
+
+      partnerName:         raw.partnerName,
+      partnerPhone:        raw.partnerPhone,
+      partnerLocation:     raw.partnerLocation,
+      partnerDamageDetail: raw.partnerDamageDetail,
+      partnerDamageAmount: raw.partnerDamageAmount?.toString() ?? null,
+      partnerVictimDetail: raw.partnerVictimDetail,
+
+      submittedAt: raw.submittedAt?.toISOString() ?? null,
+      createdAt:   raw.createdAt.toISOString(),
+      updatedAt:   raw.updatedAt.toISOString(),
+
+      attachments: raw.attachments.map(att => ({
+        id:       att.id,
+        fileName: att.fileName,
+        url:      att.url,
+        type:     att.type,
+        createdAt: att.uploadedAt.toISOString(),
+      })),
+    }
     res.json({ claim });
   } catch (err) {
-    next(err);
+    next(err)
   }
-};
+}
+
+
+
 export const updateClaim: RequestHandler = async (req, res, next) => {
   try {
     const claimId = req.params.id;
@@ -272,8 +296,8 @@ export const claimAction: RequestHandler = async (req, res, next) => {
     }
 
     const { id } = req.params;
-    const { action } = req.body as { action?: string };
-
+    const { action, comment } = req.body as { action: string; comment?: string }
+    
     if (!action) {
       res.status(400).json({ message: "Missing action" });
       return;
@@ -297,7 +321,16 @@ export const claimAction: RequestHandler = async (req, res, next) => {
 
     const updated = await prisma.claim.update({
       where: { id },
-      data: { status: newStatus },
+      data: { status: newStatus,
+        ...(comment && { insurerComment: comment }),
+       },
+      include: {
+        attachments: true,
+        // if you need other nested fields, include them too:
+        // createdBy: { select: { name: true, role: true } },
+        // etc.
+      },
+
     });
 
     res.json({ claim: updated });
