@@ -128,7 +128,7 @@ export default function ClaimDetailPage() {
   if (!claim) return <p className="p-6">Loading…</p>
 
   // Editable only when status is DRAFT or Pending insurer review
-  const readOnly = claim.status !== 'DRAFT' && claim.status !== 'PENDING_INSURER_REVIEW'
+  const readOnly = claim.status !== 'DRAFT' 
 
   // Handle file selection
   const handleFileChange = (

@@ -80,10 +80,15 @@ export default function DashboardPage() {
   // 3) Split into sections:
   const draftClaims = visible.filter(c => c.status === 'DRAFT')
   const pendingInsurer = visible.filter(c => c.status === 'PENDING_INSURER_REVIEW')
-  const otherClaims = visible.filter(
-    c => c.status !== 'DRAFT' && c.status !== 'PENDING_INSURER_REVIEW'
-  )
-
+  const otherClaims = visible.filter((c: { status: string }) => {
+    if (session?.user.role === "USER") {
+      return c.status !== 'DRAFT';
+    }
+    if (session?.user.role === "INSURANCE") {
+      return c.status !== 'PENDING_INSURER_REVIEW';
+    }
+    return true;
+  })
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-6">
       <div className="max-w-6xl mx-auto space-y-10">
