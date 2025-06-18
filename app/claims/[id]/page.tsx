@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { ClaimForm, ClaimFormValues, User } from '@/components/ClaimForm'
+import Swal from 'sweetalert2'
 
 interface Attachment {
   id: string
@@ -15,6 +16,7 @@ interface Attachment {
 }
 
 interface ClaimPayload {
+  insurerComment: any
   id: string
   status: string
   approverId: string
@@ -37,6 +39,7 @@ interface ClaimPayload {
   partnerDamageAmount: string
   partnerVictimDetail: string
   attachments: Attachment[]
+  createdByName : string
 }
 
 export default function ClaimDetailPage() {
@@ -106,6 +109,7 @@ export default function ClaimDetailPage() {
           partnerDamageDetail: data.claim.partnerDamageDetail,
           partnerDamageAmount: String(data.claim.partnerDamageAmount ?? ''),
           partnerVictimDetail: data.claim.partnerVictimDetail,
+          
         })
       })
       .catch(console.error)
@@ -127,9 +131,12 @@ export default function ClaimDetailPage() {
 
   if (!claim) return <p className="p-6">Loading…</p>
 
-  // Editable only when status is DRAFT or Pending insurer review
-  const readOnly = claim.status !== 'DRAFT' 
-
+  // Editable only when status is DRAFT or AWAITING_EVIDENCE
+  const editableStatuses = ['DRAFT', 'AWAITING_EVIDENCE']
+  const canEdit =
+    session!.user.role !== 'INSURANCE' &&
+    editableStatuses.includes(claim.status)
+  const readOnly = !canEdit
   // Handle file selection
   const handleFileChange = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -174,6 +181,23 @@ export default function ClaimDetailPage() {
 
   // Handle insurer actions
   const handleAction = async (action: 'approve' | 'reject' | 'request_evidence') => {
+    let comment: string | undefined
+
+  // For reject / request_evidence, prompt for a comment
+  if (action === 'reject' || action === 'request_evidence') {
+    const { value: text } = await Swal.fire({
+      title: action === 'reject' ? 'กรุณาใส่เหตุผลการปฏิเสธ' : 'ขอเอกสารเพิ่มเติม กรุณาอธิบาย',
+      input: 'textarea',
+      inputPlaceholder: 'พิมพ์ข้อความที่นี่...',
+      inputAttributes: { 'aria-label': 'Your comment' },
+      showCancelButton: true
+    })
+    if (!text) {
+      // user cancelled or empty
+      return
+    }
+    comment = text
+  }
     setActionLoading(true)
     try {
       const res = await fetch(
@@ -184,17 +208,23 @@ export default function ClaimDetailPage() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${session!.user.accessToken}`,
           },
-          body: JSON.stringify({ action }),
+          body: JSON.stringify({ action ,comment}),
         }
       )
       if (!res.ok) throw new Error(await res.text())
-      const data = await res.json()
-      setClaim(data.claim)
-    } catch (err: any) {
-      alert(err.message)
-    } finally {
-      setActionLoading(false)
-    }
+
+    // instead of using res.json() directly:
+    const detailRes = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/claims/${id}`, {
+      headers: { Authorization: `Bearer ${session!.user.accessToken}` },
+    })
+    const { claim: freshClaim } = await detailRes.json()
+    setClaim(freshClaim)
+    router.push('/dashboard')
+  } catch (e: any) {
+    alert(e.message)
+  } finally {
+    setActionLoading(false)
+  }
   }
 
   // Map field to attachment type
@@ -203,9 +233,20 @@ export default function ClaimDetailPage() {
     estimateFiles: 'ESTIMATE_DOC',
     otherFiles: 'OTHER_DOCUMENT',
   } as const
-
+  
   return (
     <div className="max-w-3xl mx-auto py-10 space-y-8">
+      {/* 2) Insurer’s comment, if any */}
+    {claim.insurerComment && (
+      <div className="mt-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+        <h4 className="font-semibold">Comment from Insurer:</h4>
+        <p className="whitespace-pre-wrap">{claim.insurerComment}</p>
+      </div>
+    )}
+    <div className="mb-6 text-gray-700">
+  <span className="font-semibold">ผู้กรอกแบบฟอร์ม:</span> {claim.createdByName}
+</div>
+
       {/* Form Section */}
       <ClaimForm
         values={values}
@@ -217,9 +258,10 @@ export default function ClaimDetailPage() {
         submitting={submitting}
         error={null}
         readOnly={readOnly}
+        isEvidenceFlow={claim.status === 'AWAITING_EVIDENCE'}
       />
-
-      {readOnly && (
+    
+      { (
         <section className="pt-6 border-t space-y-10">
           <h2 className="text-2xl font-bold">ไฟล์แนบ</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -282,7 +324,7 @@ export default function ClaimDetailPage() {
           </div>
         </section>
       )}
-
+      
       {/* Insurer Action Buttons */}
       {isInsurer && claim.status === 'PENDING_INSURER_REVIEW' && (
         <div className="flex space-x-4">

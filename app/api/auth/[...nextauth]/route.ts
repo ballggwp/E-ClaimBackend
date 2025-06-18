@@ -146,7 +146,7 @@ export const authOptions: NextAuthOptions = {
         } else if (/Manager/i.test(posEn) && /Insurance/i.test(deptEn)) {
           role = "MANAGER";
         }
-        const name = profile.username;
+        const name = profile.employeeName?.th || profile.employeeName?.en || "Unknown User";
 
         // ตรวจสอบใน DB ถ้ายังไม่มีค่อย register
         const inDb = await isUserInDatabase(email);

@@ -61,6 +61,7 @@ interface ClaimFormProps {
     estimateFiles: File[];
     otherFiles: File[];
   };
+  isEvidenceFlow?: boolean;
 }
 
 export function ClaimForm({
@@ -73,6 +74,7 @@ export function ClaimForm({
   error,
   files,
   readOnly = false,
+  isEvidenceFlow = false,
 }: ClaimFormProps) {
   // define which fields are required for full submit
   const requiredTextFields: { key: keyof ClaimFormValues; label: string }[] = [
@@ -93,9 +95,10 @@ export function ClaimForm({
         if (!values[key] || values[key].trim() === "") missing.push(label);
       });
       // validate two required file inputs
+      if (!isEvidenceFlow) {
       if (files.damageFiles.length === 0)   missing.push("รูปภาพความเสียหาย");
       if (files.estimateFiles.length === 0) missing.push("เอกสารสำรวจความเสียหาย");
-
+      }
       if (missing.length > 0) {
         Swal.fire({
           icon: "warning",
@@ -460,7 +463,9 @@ export function ClaimForm({
 
         {/* Buttons */}
         {!readOnly && (
+          
           <div className="flex space-x-4 pt-4">
+            {(!isEvidenceFlow&&
             <button
               type="button"
               onClick={() => handleClick(true)}
@@ -469,6 +474,7 @@ export function ClaimForm({
             >
               Save Draft
             </button>
+            )}
             <button
               type="button"
               onClick={() => handleClick(false)}
@@ -481,6 +487,7 @@ export function ClaimForm({
             </button>
           </div>
         )}
+        
 
         
       </form>

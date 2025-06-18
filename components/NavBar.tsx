@@ -38,6 +38,14 @@ export default function NavBar() {
           >
             เคลม
           </Link>
+          {status === "authenticated" && session?.user?.role === "INSURANCE" && (
+            <Link
+              href="/fppa04"
+              className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-blue-100 hover:text-blue-700 transition"
+            >
+              ฟปภ04
+            </Link>
+          )}
         </div>
 
         {/* User Section */}

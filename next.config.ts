@@ -9,7 +9,7 @@ module.exports = {
       {
         source: '/uploads/:path*',
         destination: `${process.env.NEXT_PUBLIC_BACKEND_URL}/uploads/:path*`
-      }
+      },
     ]
   }
 }
