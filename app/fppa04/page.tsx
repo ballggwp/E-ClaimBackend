@@ -23,7 +23,7 @@ export default function FPPA04ListPage() {
     if (status !== 'authenticated') return
 
     fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/fppa04`, {
-      headers: { Authorization: `Bearer ${session!.user.accessToken}` },
+      headers: { 'Content-Type': 'application/json',Authorization: `Bearer ${session!.user.accessToken}` },
     })
       .then(r => {
         if (!r.ok) throw new Error(r.statusText)

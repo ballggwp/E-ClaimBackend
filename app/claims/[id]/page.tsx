@@ -6,6 +6,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { ClaimForm, ClaimFormValues, User } from '@/components/ClaimForm'
 import Swal from 'sweetalert2'
+import Link from 'next/link'
 
 interface Attachment {
   id: string
@@ -130,7 +131,12 @@ export default function ClaimDetailPage() {
   }, [status, session])
 
   if (!claim) return <p className="p-6">Loading…</p>
-
+  const allowed = [
+    'PENDING_MANAGER_REVIEW',
+    'PENDING_USER_CONFIRM',
+    'AWAITING_SIGNATURES',
+    'COMPLETED',
+  ]
   // Editable only when status is DRAFT or AWAITING_EVIDENCE
   const editableStatuses = ['DRAFT', 'AWAITING_EVIDENCE']
   const canEdit =
@@ -246,7 +252,20 @@ export default function ClaimDetailPage() {
     <div className="mb-6 text-gray-700">
   <span className="font-semibold">ผู้กรอกแบบฟอร์ม:</span> {claim.createdByName}
 </div>
+    <div className="p-6 space-y-4">
+      <h1 className="text-2xl font-bold">Claim Detail: {claim.id}</h1>
+      {/* … your other claim fields … */}
+      <p>Status: <span className="font-semibold">{claim.status}</span></p>
 
+      {allowed.includes(claim.status) && (
+        <Link
+          href={`/fppa04/${claim.id}`}
+          className="inline-block mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          → ไปยัง FPPA-04
+        </Link>
+      )}
+    </div>
       {/* Form Section */}
       <ClaimForm
         values={values}
@@ -260,7 +279,7 @@ export default function ClaimDetailPage() {
         readOnly={readOnly}
         isEvidenceFlow={claim.status === 'AWAITING_EVIDENCE'}
       />
-    
+      
       { (
         <section className="pt-6 border-t space-y-10">
           <h2 className="text-2xl font-bold">ไฟล์แนบ</h2>

@@ -1,3 +1,4 @@
+// app/fppa04/[claimId]/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -5,22 +6,36 @@ import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Swal from 'sweetalert2'
 import FPPA04Form, { FPPA04FormValues } from '@/components/FPPA04Form'
+import Link from 'next/link'
 
 interface ClaimDefaults {
   cause: string
+  approverName: string
+  status: string
 }
 
-interface FPPA04Data extends FPPA04FormValues {}
+interface FPPA04Data extends FPPA04FormValues {
+  signatureFiles: File[]
+}
 
 export default function FPPA04DetailPage() {
   const { claimId } = useParams()
   const router = useRouter()
   const { data: session, status } = useSession()
 
-  const [defaults, setDefaults] = useState<ClaimDefaults | null>(null)
-  const [initial, setInitial] = useState<FPPA04Data | null>(null)
-  const [loading, setLoading] = useState(true)
-
+  const [defaults, setDefaults] = useState<{
+    cause: string
+    approverName: string
+   status: string
+  }|null>(null)
+  const [initial, setInitial]   = useState<FPPA04Data|null>(null)
+  const [loading, setLoading]   = useState(true)
+  const showBack = [
+    'PENDING_MANAGER_REVIEW',
+    'PENDING_USER_CONFIRM',
+    'AWAITING_SIGNATURES',
+    'COMPLETED',
+  ].includes(defaults?.status ?? '')
   useEffect(() => {
     if (status !== 'authenticated') return
     ;(async () => {
@@ -32,7 +47,12 @@ export default function FPPA04DetailPage() {
         if (!res.ok) throw new Error(await res.text())
         const { form, claim } = await res.json()
 
-        setDefaults({ cause: claim.cause })
+        setDefaults({
+          cause: claim.cause,
+          approverName: claim.approverName,
+          status : claim.status
+        })
+        
 
         if (form) {
           setInitial({
@@ -53,12 +73,12 @@ export default function FPPA04DetailPage() {
                                   total:       i.total.toString(),
                                   exception:   i.exception.toString(),
                                 })),
-            adjustments:       form.adjustments.map((a:any)=>({
+            adjustments:       form.adjustments.map((a:any) => ({
                                   type:        a.type,
                                   description: a.description,
                                   amount:      a.amount.toString(),
                                 })),
-            signatureFiles:    [], // Convert string[] to File[] or leave as empty array
+            signatureFiles:    [],
           })
         }
       } catch (e:any) {
@@ -69,82 +89,54 @@ export default function FPPA04DetailPage() {
       }
     })()
   }, [status, claimId, session])
-
+  
   if (loading || !defaults) {
-    return <div className="flex items-center justify-center h-screen"><p className="text-gray-600">กำลังโหลด…</p></div>
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p>กำลังโหลด…</p>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-12 px-4">
-      <div className="max-w-5xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
-        {/* Header */}
-        <div className="px-8 py-6 border-b border-gray-200">
-          <h1 className="text-3xl font-extrabold text-gray-800">
-            FPPA04 — Claim {claimId}
-          </h1>
-          <p className="mt-1 text-gray-500">
-            กรอกข้อมูลกรมธรรม์และรายละเอียดเคลม
-          </p>
-        </div>
+    <div className="min-h-screen bg-gray-100 py-8 px-4">
+      <div className="max-w-5xl mx-auto">
+        {/* ===== HEADER WITH BOTH LINKS ===== */}
+    <div className="bg-white p-4 rounded-t-lg flex items-center justify-between">
+      <h2 className="text-lg font-medium text-gray-800">
+        Claim ID: <span className="font-semibold">{claimId}</span>
+      </h2>
 
-        {/* Content */}
-        <div className="px-8 py-6 space-y-8">
-          {/* Claim Defaults */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-gray-700 font-medium mb-1">
-                เลขที่แบบฟอร์มแจ้งอุบัติเหตุ
-              </label>
-              <input
-                readOnly
-                value={claimId}
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-gray-700 font-medium mb-1">
-                สาเหตุของอุบัติเหตุ
-              </label>
-              <textarea
-                readOnly
-                value={defaults.cause}
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 h-20 resize-none"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-gray-700 font-medium mb-1">
-                เหตุการณ์
-              </label>
-              <input
-                readOnly
-                value={initial?.eventDescription || ''}
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2"
-              />
-            </div>
+      <div className="flex items-center space-x-2">
+
+        {/* ไปยัง FPPA-04 */}
+         (
+          <Link
+            href={`/claims/${claimId}`}
+            className="text-blue-600 hover:underline"
+          >
+            → ดู claims
+          </Link>
+        )
+      </div>
+    </div>
+
+        {/* ==== CARD with Header + Form ==== */}
+        <div className="bg-white rounded-b-xl shadow overflow-hidden">
+          {/* Header */}
+          <div className="px-8 py-6 border-b">
+            <h1 className="text-3xl font-bold justify-center ">รายงานสรุปรายการรับเงินค่าสินไหมทดแทน</h1>
+            <p className="text-gray-600 mt-1 ">กรอกข้อมูลกรมธรรม์และรายละเอียดเคลม</p>
           </div>
 
-          {/* FPPA04 Form */}
-          <FPPA04Form
-            initialData={
-            initial ?? {
-              eventType: '',
-              eventDescription: '',
-              claimRefNumber: '',
-              productionYear: '',
-              accidentDate: '',
-              reportedDate: '',
-              receivedDocDate: '',
-              company: '',
-              factory: '',
-              policyNumber: '',
-              surveyorRefNumber: '',
-              items: [],
-              adjustments: [],
-              signatureFiles: [],
-            }
-          }
-            onSave={() => router.push('/fppa04')}
-          />
+          {/* Form */}
+          <div className="px-8 py-6">
+            <FPPA04Form
+              initialData={initial ?? undefined}
+              defaults={defaults}
+              onSave={() => router.push('/fppa04')}
+            />
+          </div>
         </div>
       </div>
     </div>

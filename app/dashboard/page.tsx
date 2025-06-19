@@ -176,6 +176,14 @@ export default function DashboardPage() {
   );
 }
 
+// List of statuses that should show the FPPA-04 link
+const fppaLinkStatuses = [
+  "PENDING_MANAGER_REVIEW",
+  "PENDING_USER_CONFIRM",
+  "AWAITING_SIGNATURES",
+  "COMPLETED",
+];
+
 function Section({
   title,
   claims,
@@ -201,6 +209,7 @@ function Section({
                 <th className="px-6 py-3 text-left font-medium">Date</th>
                 <th className="px-6 py-3 text-left font-medium">Status</th>
                 <th className="px-6 py-3 text-left font-medium">Comment</th>
+                <th className="px-6 py-3 text-left font-medium">FPPA-04</th>
               </tr>
             </thead>
             <tbody>
@@ -239,6 +248,16 @@ function Section({
                       <span className="text-gray-400">—</span>
                     )}
                   </td>
+                  <td className="px-6 py-3">
+                   {fppaLinkStatuses.includes(c.status) ? (
+                     <Link
+                       href={`/fppa04/${c.id}`}
+                       className="text-blue-600 hover:underline"                     >
+                       ดูฟอร์ม
+                     </Link>                   ) : (
+                    <span className="text-gray-400">—</span>
+                   )}
+                 </td>
                 </tr>
               ))}
             </tbody>
