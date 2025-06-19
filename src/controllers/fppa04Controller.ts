@@ -13,6 +13,7 @@ export const getFppa04: RequestHandler = async (req, res, next) => {
             cause:        true,
             approverId:   true,
             approverName: true,
+            status:       true,
           }
         },
         items: true,
@@ -37,81 +38,108 @@ export const getFppa04: RequestHandler = async (req, res, next) => {
 export const upsertFppa04: RequestHandler = async (req, res, next) => {
   try {
     const claimId = req.params.claimId
-    const b = req.body
+    const b = req.body as Record<string, any>
 
-    // parse arrays
-    const items = Array.isArray(b.items) ? b.items : []
-    const adjustments = Array.isArray(b.adjustments) ? b.adjustments : []
-    const signatures = Array.isArray(b.signatureFiles)
-      ? b.signatureFiles
+    // -- PARSE ARRAYS --
+    const rawItems: string[] = b.items
+      ? Array.isArray(b.items)
+        ? b.items
+        : [b.items]
       : []
 
+    // 2) Parse JSON & sanitize
+    const itemsData = rawItems.map(s => {
+      const it = JSON.parse(s)
+      return {
+        category:    it.category,
+        description: it.description,
+        total:       parseFloat(it.total   ?? "") || 0,
+        exception:   parseFloat(it.exception ?? "") || 0,
+      }
+    })
+
+    // 3) Do the same for adjustments!
+    const rawAdjs: string[] = b.adjustments
+      ? Array.isArray(b.adjustments)
+        ? b.adjustments
+        : [b.adjustments]
+      : []
+
+    const adjsData = rawAdjs.map(s => {
+      const a = JSON.parse(s)
+      return {
+        type:        a.type,
+        description: a.description,
+        amount:      parseFloat(a.amount ?? "") || 0,
+      }
+    })
+
+    // -- SIGNATURE FILES (multer diskStorage → public/uploads) --
+    const files = (req.files as Express.Multer.File[]) || []
+    const signatureFiles = files.map(f => `/uploads/${f.filename}`)
+
+    // -- UP S E R T --
     const record = await prisma.fppa04.upsert({
       where: { claimId },
       create: {
-        claimId,
-        eventType:         b.eventType,
-        claimRefNumber:    b.claimRefNumber,
-        eventDescription:  b.eventDescription,
-        productionYear:    parseInt(b.productionYear),
-        accidentDate:      new Date(b.accidentDate),
-        reportedDate:      new Date(b.reportedDate),
-        receivedDocDate:   new Date(b.receivedDocDate),
-        company:           b.company,
-        factory:           b.factory,
-        policyNumber:      b.policyNumber,
-        surveyorRefNumber: b.surveyorRefNumber,
+        claimId:         claimId,
+        eventType:       b.eventType,
+        claimRefNumber:  b.claimRefNumber,
+        eventDescription:b.eventDescription,
+        productionYear:  parseInt(b.productionYear, 10),
+        accidentDate:    new Date(b.accidentDate),
+        reportedDate:    new Date(b.reportedDate),
+        receivedDocDate: new Date(b.receivedDocDate),
+        company:         b.company,
+        factory:         b.factory,
+        policyNumber:    b.policyNumber,
+        surveyorRefNumber:b.surveyorRefNumber,
+        netAmount:       parseFloat(b.netAmount) || 0,
+
+        // 🔥 here we nest-create your items & adjustments
         items: {
-          create: items.map((it:any) => ({
-            category:    it.category,
-            description: it.description,
-            total:       parseFloat(it.total),
-            exception:   parseFloat(it.exception),
-          }))
+          create: itemsData
         },
         adjustments: {
-          create: adjustments.map((a:any) => ({
-            type:        a.type,
-            description: a.description,
-            amount:      parseFloat(a.amount),
-          }))
+          create: adjsData
         },
-        signatureFiles: signatures,
+        signatureFiles,
       },
       update: {
-        eventType:         b.eventType,
-        claimRefNumber:    b.claimRefNumber,
-        eventDescription:  b.eventDescription,
-        productionYear:    parseInt(b.productionYear),
-        accidentDate:      new Date(b.accidentDate),
-        reportedDate:      new Date(b.reportedDate),
-        receivedDocDate:   new Date(b.receivedDocDate),
-        company:           b.company,
-        factory:           b.factory,
-        policyNumber:      b.policyNumber,
-        surveyorRefNumber: b.surveyorRefNumber,
+        eventType:       b.eventType,
+        claimRefNumber:  b.claimRefNumber,
+        eventDescription:b.eventDescription,
+        productionYear:  parseInt(b.productionYear, 10),
+        accidentDate:    new Date(b.accidentDate),
+        reportedDate:    new Date(b.reportedDate),
+        receivedDocDate: new Date(b.receivedDocDate),
+        company:         b.company,
+        factory:         b.factory,
+        policyNumber:    b.policyNumber,
+        surveyorRefNumber:b.surveyorRefNumber,
+        netAmount:       parseFloat(b.netAmount) || 0,
+
+        // 🔥 delete ALL old children, then re-create exactly what you passed
         items: {
           deleteMany: {},
-          create: items.map((it:any) => ({
-            category:    it.category,
-            description: it.description,
-            total:       parseFloat(it.total),
-            exception:   parseFloat(it.exception),
-          }))
+          create:     itemsData
         },
         adjustments: {
           deleteMany: {},
-          create: adjustments.map((a:any) => ({
-            type:        a.type,
-            description: a.description,
-            amount:      parseFloat(a.amount),
-          }))
+          create:     adjsData
         },
-        signatureFiles: signatures,
+        signatureFiles,
       },
-      include: { claim: { select: { cause: true, approverName: true } }, items: true, adjustments: true },
+      include: {
+        claim:       { select: { cause: true, approverName: true } },
+        items:       true,
+        adjustments: true,
+      }
     })
-
+    await prisma.claim.update({
+      where: { id: claimId },
+      data: { status: 'PENDING_MANAGER_REVIEW' }
+    })
     res.json({ form: record, claim: record.claim })
   } catch (err) {
     next(err)
@@ -128,6 +156,7 @@ export const listPendingFppa04: RequestHandler = async (req, res, next) => {
       },
       orderBy: { createdAt: "desc" },
     })
+    
     res.json({ claims: raw })
   } catch (err) { next(err) }
 }

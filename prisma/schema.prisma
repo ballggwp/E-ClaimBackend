@@ -130,7 +130,7 @@ model Fppa04 {
   factory             String                // โรงงาน
   policyNumber        String                // เลขที่กรมธรรม์
   surveyorRefNumber   String                // เลขที่ Claim Surveyor
-
+  netAmount           Float
   items               Fppa04Item[]          @relation("Fppa04Items")
   adjustments         Fppa04Adjustment[]    @relation("Fppa04Adjustments")
   signatureFiles      String[]              // เก็บเป็น array ของ URL
