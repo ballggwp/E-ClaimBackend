@@ -6,44 +6,56 @@ import { AttachmentType, ClaimStatus, Prisma } from "@prisma/client";
 
 export const listClaims: RequestHandler = async (req, res, next) => {
   try {
-    if (!req.user) {
-      res.status(401).json({ message: "Unauthorized" });
-      return;
+    // อ่าน query params
+    const { userEmail, excludeStatus } = req.query as {
+      userEmail?: string
+      excludeStatus?: string
     }
 
-    const isInsurer = req.user.role === "INSURANCE";
+    // เริ่ม build เงื่อนไข where
+    const where: any = {}
 
-    // build a WHERE that
-    // ─ if INSURANCE → exclude DRAFT and exclude claims *created by* INSURANCE
-    // ─ otherwise → only your own claims
-    const where: Prisma.ClaimWhereInput = isInsurer
-      ? {
-          status:        { not: "DRAFT" },
-          createdBy:     { role: { not: "INSURANCE" } },
-        }
-      : {
-          createdById:   req.user.id,
-        };
+    // ถ้ามี excludeStatus ให้กรองสถานะออก
+    if (excludeStatus) {
+      where.status = { not: excludeStatus }
+    }
 
-    const raw = await prisma.claim.findMany({
+    // ถ้ามี userEmail ให้กรองเฉพาะเคลมที่ createdBy.email ตรงกัน
+    if (userEmail) {
+      where.createdBy = { email: userEmail }
+    }
+
+    const claims = await prisma.claim.findMany({
       where,
-      select: {
-        id:          true,
-        status:      true,
-        submittedAt: true,
-        createdAt:   true,
-        cause:       true,
-        insurerComment: true,
-        createdByName: true,
-      },
       orderBy: { createdAt: "desc" },
-    });
-    res.json({ claims: raw });
-    return;
+      select: {
+        id: true,
+        cause: true,
+        status: true,
+        createdAt: true,
+        submittedAt: true,
+        insurerComment: true,
+        // ให้ดึงชื่อผู้สร้างมาเลย
+        createdBy: { select: { name: true } },
+      },
+    })
+
+    // map ชื่อ field ให้ตรงกับ front
+    const sanitized = claims.map(c => ({
+      id: c.id,
+      cause: c.cause,
+      status: c.status,
+      createdAt: c.createdAt.toISOString(),
+      submittedAt: c.submittedAt?.toISOString() ?? null,
+      insurerComment: c.insurerComment,
+      createdByName: c.createdBy.name,
+    }))
+
+    res.json({ claims: sanitized })
   } catch (err) {
-    next(err);
+    next(err)
   }
-};
+}
 
 export const createClaim: RequestHandler = async (req, res, next) => {
   try {
@@ -336,6 +348,32 @@ export const claimAction: RequestHandler = async (req, res, next) => {
     res.json({ claim: updated });
     return;  // <— again, don’t return the call, just return void
   } catch (err) {
+    next(err);
+  }
+};
+export const ManagerAction: RequestHandler = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { action, comment } = req.body as { action: 'approve'|'reject', comment: string };
+    if (!['approve','reject'].includes(action)) {
+      res.status(400).json({ message: 'Invalid action' });
+      return;
+    }
+    // only allow MANAGER role here (you should have some middleware enforcing that)
+    const newStatus = action === 'approve'
+      ? 'PENDING_USER_CONFIRM'
+      : 'PENDING_INSURER_REVIEW';
+    const updated = await prisma.claim.update({
+      where: { id },
+      data: {
+        status: newStatus,
+        insurerComment: comment  // re-use this field for manager’s note
+      },
+      select: { id: true, status: true, insurerComment: true }
+    });
+    res.json({ claim: updated });
+    return;
+  } catch(err) {
     next(err);
   }
 };

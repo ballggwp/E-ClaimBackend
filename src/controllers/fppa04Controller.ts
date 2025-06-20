@@ -13,19 +13,25 @@ export const getFppa04: RequestHandler = async (req, res, next) => {
             cause:        true,
             approverId:   true,
             approverName: true,
-            status:       true,
+            status:       true,  // ← already here for the “has‐form” case
           }
         },
-        items: true,
+        items:       true,
         adjustments: true,
       },
     })
     if (!record) {
-      // ยังไม่มี form ให้วนไป create หน้า frontend จะเห็นฟอร์มเปล่า
-      res.json({ form: null, claim: await prisma.claim.findUnique({
+      // no form yet → still need status on this side
+      const claim = await prisma.claim.findUnique({
         where: { id: claimId },
-        select: { cause: true, approverId: true, approverName: true },
-      }) })
+        select: {
+          cause:        true,
+          approverId:   true,
+          approverName: true,
+         status:       true,  // ← add this
+        },
+      })
+      res.json({ form: null, claim })
       return
     }
     res.json({ form: record, claim: record.claim })
@@ -33,6 +39,7 @@ export const getFppa04: RequestHandler = async (req, res, next) => {
     next(err)
   }
 }
+
 
 // POST /api/fppa04/:claimId  (สร้างหรืออัปเดต)
 export const upsertFppa04: RequestHandler = async (req, res, next) => {
