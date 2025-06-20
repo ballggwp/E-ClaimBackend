@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import React, { ChangeEvent, FormEvent, useState } from "react";
 import { useSession } from "next-auth/react";
 import Swal from "sweetalert2";
+import router from "next/router";
 
 export interface FPPA04FormItem {
   category: string;
@@ -51,6 +52,8 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
   const { claimId } = useParams();
   const canEdit = defaults.status === "PENDING_INSURER_FORM";
   const { data: session } = useSession();
+  const isManager = session?.user.role === "MANAGER";
+  const canReviewManager = isManager && defaults.status === "PENDING_MANAGER_REVIEW";
 
   // initialize state
   const [vals, setVals] = useState<FPPA04FormValues>(() => ({
@@ -69,7 +72,33 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
     adjustments: initialData?.adjustments || [],
     signatureFiles: [],
   }));
-
+  const ManagerAction = async (action: "approve" | "reject") => {
+    const { value: comment } = await Swal.fire({
+      title: action === "approve" ? "อนุมัติแบบฟอร์ม?" : "ปฏิเสธแบบฟอร์ม?",
+      input: "textarea",
+      inputLabel: "หมายเหตุ (ไม่บังคับ)",
+      showCancelButton: true,
+      confirmButtonText: action === "approve" ? "ใช่, อนุมัติ" : "ใช่, ปฏิเสธ",
+      cancelButtonText: "ยกเลิก",
+    });
+    if (comment === undefined) return;
+    const res = await fetch(
+      `/api/claims/${claimId}/review`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.user.accessToken}`,
+        },
+        body: JSON.stringify({ action, comment }),
+      }
+    );
+    if (!res.ok) {
+      const txt = await res.text();
+      return Swal.fire("Error", txt, "error");
+    }
+    Swal.fire("สำเร็จ!", "ระบบอัปเดตสถานะแล้ว", "success").then(() => router.replace("/dashboard"));
+  };
   // handlers preventing edit when not allowed
   const handleField = (e: ChangeEvent<HTMLInputElement|HTMLTextAreaElement>) => {
     if (!canEdit) return;
@@ -145,8 +174,8 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
 
   const inputClass = (editable: boolean) =>
     `w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm focus:outline-none transition ${editable ? 'bg-white' : 'bg-gray-100 text-gray-600 cursor-not-allowed'}`;
-
   return (
+    
     <form onSubmit={onSubmit} className="space-y-8">
 
       {/* Top Section */}
@@ -303,158 +332,166 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
         </div>
       </div>
 
-      {/* Items Table */}
-      <div>
-        <h3 className="font-semibold mb-2">รายการแจ้งเคลมประกัน</h3>
-        <div className="overflow-auto max-h-64">
-          <table className="w-full table-fixed border-collapse border border-blue-200">
-            <colgroup><col className="w-1/5"/><col className="w-2/5"/><col className="w-1/5"/><col className="w-1/5"/><col className="w-1/5"/></colgroup>
-            <thead className="bg-blue-50 sticky top-0">
-              <tr>
-                <th className="px-2 py-1 border-blue-200 text-center text-sm">รายการ</th>
-                <th className="px-2 py-1 border-blue-200 text-center text-sm">รายละเอียด</th>
-                <th className="px-2 py-1 border-blue-200 text-center text-sm">รวม</th>
-                <th className="px-2 py-1 border-blue-200 text-center text-sm">ข้อยกเว้น</th>
-                <th className="px-2 py-1 border-blue-200 text-center text-sm">คุ้มครอง</th>
-              </tr>
-            </thead>
-            <tbody>
-              {vals.items.map((it,idx)=>{
-                const cover = (parseFloat(it.total||"0") - parseFloat(it.exception||"0")).toFixed(2);
-                return (
-                  <tr key={idx} className="hover:bg-blue-100">
-                    <td className="p-1 border border-blue-200">
-                      <input
-                        type="text"
-                        placeholder="..."
-                        value={it.category}
-                        onChange={e=>changeItem(idx,"category",e.target.value)}
-                        disabled={!canEdit}
-                        className={inputClass(canEdit)}
-                      />
-                    </td>
-                    <td className="p-1 border border-blue-200">
-                      <input
-                        type="text"
-                        placeholder="..."
-                        value={it.description}
-                        onChange={e=>changeItem(idx,"description",e.target.value)}
-                        disabled={!canEdit}
-                        className={inputClass(canEdit)}
-                      />
-                    </td>
-                    <td className="p-1 border border-blue-200">
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={it.total}
-                        onChange={e=>changeItem(idx,"total",e.target.value)}
-                        disabled={!canEdit}
-                        className={inputClass(canEdit)}
-                      />
-                    </td>
-                    <td className="p-1 border border-blue-200">
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={it.exception}
-                        onChange={e=>changeItem(idx,"exception",e.target.value)}
-                        disabled={!canEdit}
-                        className={inputClass(canEdit)}
-                      />
-                    </td>
-                    <td className="p-1 border border-blue-200 text-right">{cover}</td>
-                    {canEdit && <td className="p-1 border border-blue-200 text-center text-red-600 cursor-pointer" onClick={()=>delItem(idx)}>✖</td>}
-                  </tr>
-                );
-              })}
-              <tr className="bg-blue-50 font-semibold text-xs">
-                <td colSpan={2} className="p-1 border border-blue-200 text-right">รวม</td>
-                <td className="p-1 border border-blue-200 text-right">{totalSum.toFixed(2)}</td>
-                <td className="p-1 border border-blue-200 text-right">{exceptionSum.toFixed(2)}</td>
-                <td className="p-1 border border-blue-200 text-right">{coverageSum.toFixed(2)}</td>
-                {canEdit && <td className="border border-blue-200"></td>}
-              </tr>
-            </tbody>
-          </table>
-          {canEdit && <button type="button" onClick={addItem} className="text-blue-600 hover:underline text-xs mt-2">+ เพิ่มรายการ</button>}
-        </div>
-      </div>
+      {/* ตารางรายการแจ้งเคลมประกัน */}
+<div className="overflow-auto max-h-64">
+  <table className=" table-fixed border-collapse ">
+    <colgroup>
+      <col className="w-1/5"/>
+      <col className="w-2/5"/>
+      <col className="w-1/5"/>
+      <col className="w-1/5"/>
+      <col className="w-1/5"/>
+    </colgroup>
+    <thead className="bg-blue-50 sticky top-0">
+      <tr>
+        {["รายการ","รายละเอียด","รวม","ข้อยกเว้น","คุ้มครอง"].map((h,i) => (
+          <th
+            key={i}
+            className="px-2 py-1 border border-blue-200 text-center text-sm text-blue-800"
+          >{h}</th>
+        ))}
+      </tr>
+    </thead>
+    <tbody>
+      {vals.items.map((it, idx) => {
+        const cover = (parseFloat(it.total||"0") - parseFloat(it.exception||"0")).toFixed(2);
+        return (
+          <tr key={idx} className="hover:bg-blue-100">
+            {(["category","description","total","exception"] as const).map((f,ci) => (
+              <td key={ci} className="px-2 py-1.5 border border-blue-200">
+                <input
+                  type={f==="total"||f==="exception"?"number":"text"}
+                  step="0.01"
+                  placeholder={f==="total"||f==="exception"?"0.00":undefined}
+                  value={(it as any)[f]}
+                  onChange={e=>changeItem(idx,f,e.target.value)}
+                  disabled={!canEdit}
+                  className="w-full border border-gray-300 px-2 py-1.5 rounded text-xs transition
+                             bg-white focus:outline-none focus:ring-2 focus:ring-blue-400
+                             disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
+                />
+              </td>
+            ))}
+            <td className="px-2 py-1 border border-blue-200 text-right text-xs">{cover}</td>
+            {canEdit && (
+              <td
+                className="px-2 py-1 text-center text-red-600 cursor-pointer text-xs"
+                onClick={()=>delItem(idx)}
+              >✖</td>
+            )}
+          </tr>
+        );
+      })}
+      <tr className="bg-blue-50 font-semibold text-xs">
+        <td colSpan={2} className="px-2 py-1.5 border border-blue-200 text-right">รวม</td>
+        <td className="px-2 py-1.5 border border-blue-200 text-right">{totalSum.toFixed(2)}</td>
+        <td className="px-2 py-1.5 border border-blue-200 text-right">{exceptionSum.toFixed(2)}</td>
+        <td className="px-2 py-1.5 border border-blue-200 text-right">{coverageSum.toFixed(2)}</td>
+        {canEdit && <td className="bg-white"></td>}
+      </tr>
+    </tbody>
+  </table>
+  {canEdit && (
+    <button
+      type="button"
+      onClick={addItem}
+      className="mt-2 text-blue-600 hover:underline text-xs"
+    >+ เพิ่มรายการ</button>
+  )}
+</div>
 
 <hr className="my-6 border-t border-blue-200" />
 
 {/* ตารางรายการบวก/หัก */}
-      <div className="overflow-auto max-h-48">
-        <table className="w-full table-fixed border-collapse border border-blue-200">
-          <caption className="sr-only">รายการบวก/หัก</caption>
-          <colgroup><col className="w-2/6"/><col className="w-3/6"/><col style={{width:'100px'}}/></colgroup>
-          <thead className="bg-blue-50 sticky top-0">
-            <tr>
-              {['บวก/หัก','รายละเอียด','จำนวนเงิน (บาท)'].map((h,i)=> (
-                <th key={i} className="px-2 py-1 border border-blue-200 text-center text-blue-800 text-sm">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {vals.adjustments.map((a,idx)=>(
-              <tr key={idx} className={`hover:bg-blue-100 ${!canEdit?'opacity-50':''}`}>
-                <td className="p-1 border border-blue-200 text-center">
-                  <select
-                    value={a.type}
-                    onChange={e=>changeAdj(idx,'type',e.target.value)}
-                    disabled={!canEdit}
-                    className={inputClass(canEdit)}
-                  >
-                    <option value="บวก">บวก</option>
-                    <option value="หัก">หัก</option>
-                  </select>
-                </td>
-                <td className="p-1 border border-blue-200">
-                  <input
-                    type="text"
-                    placeholder="รายละเอียด"
-                    value={a.description}
-                    onChange={e=>changeAdj(idx,'description',e.target.value)}
-                    disabled={!canEdit}
-                    className={inputClass(canEdit)}
-                  />
-                </td>
-                <td className="p-1 border border-blue-200 relative">
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={a.amount}
-                    onChange={e=>changeAdj(idx,'amount',e.target.value)}
-                    disabled={!canEdit}
-                    className={inputClass(canEdit)}
-                  />
-                  {canEdit && (
-                    <button
-                      type="button"
-                      onClick={()=>delAdj(idx)}
-                      className="absolute top-1/2 right-1 transform -translate-y-1/2 text-red-600 hover:text-red-800 text-sm"
-                      aria-label="ลบรายการปรับ"
-                    >✖</button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {canEdit && (
-          <button
-            type="button"
-            onClick={addAdj}
-            className="text-blue-600 hover:underline text-xs mt-2"
-          >+ เพิ่มรายการปรับ</button>
-        )}
-      </div>
+<div className="overflow-auto max-h-48">
+  <table className="table-fixed border-collapse">
+    <colgroup>
+      <col className="w-1/6"/>
+      <col className="w-3/6"/>
+      <col className="w-2/6"/>
+    </colgroup>
+    <thead className="bg-blue-50 sticky top-0">
+      <tr>
+        {["บวก/หัก","รายละเอียด","จำนวนเงิน (บาท)"].map((h, i) => (
+          <th
+            key={i}
+            className="px-2 py-1.5 border border-blue-200 text-center text-sm text-blue-800"
+          >
+            {h}
+          </th>
+        ))}
+      </tr>
+    </thead>
+    <tbody>
+      {vals.adjustments.map((a, idx) => (
+        <tr key={idx} className="hover:bg-blue-100">
+          {/* บวก/หัก */}
+          <td className="px-2 py-1.5 border border-blue-200 text-center text-xs">
+            <select
+              value={a.type}
+              onChange={e => changeAdj(idx, "type", e.target.value)}
+              disabled={!canEdit}
+              className="w-full border border-gray-300 px-2 py-1.5 rounded text-xs transition
+                         bg-white focus:outline-none focus:ring-2 focus:ring-blue-400
+                         disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
+            >
+              <option value="บวก">บวก</option>
+              <option value="หัก">หัก</option>
+            </select>
+          </td>
+          {/* รายละเอียด */}
+          <td className="px-2 py-1.5 border border-blue-200">
+            <input
+              type="text"
+              value={a.description}
+              onChange={e => changeAdj(idx, "description", e.target.value)}
+              disabled={!canEdit}
+              className="w-full border border-gray-300 px-2 py-1.5 rounded text-xs transition
+                         bg-white focus:outline-none focus:ring-2 focus:ring-blue-400
+                         disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
+            />
+          </td>
+          {/* จำนวนเงิน */}
+          <td className="px-2 py-1.5 border border-blue-200">
+            <input
+              type="number"
+              step="0.01"
+              value={a.amount}
+              onChange={e => changeAdj(idx, "amount", e.target.value)}
+              disabled={!canEdit}
+              className="w-full border border-gray-300 px-2 py-1.5 rounded text-xs transition
+                         bg-white focus:outline-none focus:ring-2 focus:ring-blue-400
+                         disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
+            />
+          </td>
+          {/* ปุ่มลบ */}
+          {canEdit && (
+            <td
+              className="px-2 py-1 text-center text-red-600 cursor-pointer text-sm"
+              onClick={() => delAdj(idx)}
+            >
+              ✖
+            </td>
+          )}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+  {canEdit && (
+    <button
+      type="button"
+      onClick={addAdj}
+      className="mt-2 text-blue-600 hover:underline text-xs"
+    >
+      + เพิ่มรายการปรับ
+    </button>
+  )}
+</div>
 
       {/* สรุปยอดสุทธิ */}
       <div className="flex justify-end items-baseline space-x-2">
         <span className="font-semibold">เงินรับค่าสินไหมสุทธิ:</span>
-        <input readOnly value={finalNet.toFixed(2)} className="w-32 text-right bg-blue-50 border border-blue-200 rounded px-3 py-2" />
+        <input readOnly value={finalNet.toFixed(2)} className="w-32 text-right bg-blue-50 border border-blue-200 rounded px-2 py-1.5 block mb-1 font-medium" />
         <span>บาท</span>
       </div>
 
@@ -472,6 +509,18 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
           <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded">
             บันทึก FPPA04
           </button>
+        </div>
+      )}
+      {canReviewManager && (
+        <div className="flex justify-end space-x-2 mb-4">
+          <button
+            onClick={() => ManagerAction('reject')}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
+          >ปฏิเสธ</button>
+          <button
+            onClick={() => ManagerAction('approve')}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+          >อนุมัติ</button>
         </div>
       )}
     </form>

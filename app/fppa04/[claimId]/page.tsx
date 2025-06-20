@@ -8,12 +8,6 @@ import Swal from 'sweetalert2'
 import FPPA04Form, { FPPA04FormValues } from '@/components/FPPA04Form'
 import Link from 'next/link'
 
-interface ClaimDefaults {
-  cause: string
-  approverName: string
-  status: string
-}
-
 interface FPPA04Data extends FPPA04FormValues {
   signatureFiles: File[]
 }
@@ -30,12 +24,6 @@ export default function FPPA04DetailPage() {
   }|null>(null)
   const [initial, setInitial]   = useState<FPPA04Data|null>(null)
   const [loading, setLoading]   = useState(true)
-  const showBack = [
-    'PENDING_MANAGER_REVIEW',
-    'PENDING_USER_CONFIRM',
-    'AWAITING_SIGNATURES',
-    'COMPLETED',
-  ].includes(defaults?.status ?? '')
   useEffect(() => {
     if (status !== 'authenticated') return
     ;(async () => {
@@ -52,7 +40,7 @@ export default function FPPA04DetailPage() {
           approverName: claim.approverName,
           status : claim.status
         })
-        
+
 
         if (form) {
           setInitial({
@@ -97,6 +85,7 @@ export default function FPPA04DetailPage() {
       </div>
     )
   }
+  
 
   return (
     <div className="min-h-screen bg-gray-100 py-8 px-4">
@@ -140,5 +129,6 @@ export default function FPPA04DetailPage() {
         </div>
       </div>
     </div>
+    
   )
 }

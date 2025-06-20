@@ -11,13 +11,8 @@ interface ClaimSummary {
   status: string;
   submittedAt: string;
   createdAt: string;
-  user: {
-    name: string;
-    email: string;
-    role: string;
-  };
   insurerComment?: string;
-  createdByName: true;
+  createdByName: string;
 }
 
 const statusColor = (status: string) => {
@@ -29,11 +24,11 @@ const statusColor = (status: string) => {
     case "AWAITING_EVIDENCE":
       return "bg-orange-100 text-orange-800";
     case "PENDING_MANAGER_REVIEW":
-      return "bg-yellow-200 text-yellow-900";
+      return "bg-blue-100 text-blue-800";
     case "PENDING_USER_CONFIRM":
       return "bg-purple-100 text-purple-800";
     case "AWAITING_SIGNATURES":
-      return "bg-blue-100 text-blue-800";
+      return "bg-blue-200 text-blue-900";
     case "COMPLETED":
       return "bg-green-100 text-green-800";
     case "REJECTED":
@@ -47,34 +42,30 @@ export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  // 📦 All hooks at the top
   const [claims, setClaims] = useState<ClaimSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
   const isInsurer = session?.user.role === "INSURANCE";
+  const isManager = session?.user.role === "MANAGER";
 
-  // 🔄 Redirect if not logged in
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
     }
   }, [status, router]);
 
-  // 🔄 Fetch claims once authenticated or when role changes
   useEffect(() => {
     if (status !== "authenticated") return;
     (async () => {
       try {
-        const endpoint = isInsurer
-          ? `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/claims?excludeStatus=DRAFT`
-          : `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/claims?userEmail=${
-              session!.user.email
-            }`;
-
+        const base = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/claims`;
+        const endpoint = isInsurer || isManager
+          ? `${base}?excludeStatus=DRAFT`
+          : `${base}?userEmail=${session!.user.email}`;
         const res = await fetch(endpoint, {
-          headers: { Authorization: `Bearer ${session!.user.accessToken}` },
+          headers: { Authorization: `Bearer ${session!.user.accessToken}` }
         });
         if (!res.ok) throw new Error(await res.text());
         const data = await res.json();
@@ -85,42 +76,37 @@ export default function DashboardPage() {
         setLoading(false);
       }
     })();
-  }, [status, session, isInsurer]);
+  }, [status, session, isInsurer, isManager]);
 
-  // 🔍 Compute filtered list of claims
   const filtered = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    if (!term) return claims;
-    return claims.filter(
-      (c) =>
-        c.id.toLowerCase().includes(term) ||
-        c.cause.toLowerCase().includes(term) ||
-        c.status.toLowerCase().includes(term)
-    );
+    return term === ""
+      ? claims
+      : claims.filter(c =>
+          c.id.toLowerCase().includes(term) ||
+          c.cause.toLowerCase().includes(term) ||
+          c.status.toLowerCase().includes(term)
+        );
   }, [searchTerm, claims]);
 
-  // ⏳ Early returns after all hooks
   if (status === "loading" || loading) return <p className="p-6">Loading…</p>;
   if (error) return <p className="p-6 text-red-600">Error: {error}</p>;
 
-  // 🚪 Split out sections
-  const draftClaims = filtered.filter((c) => c.status === "DRAFT");
-  const pendingInsurer = filtered.filter(
-    (c) => c.status === "PENDING_INSURER_REVIEW"
-  );
-  const otherClaims = filtered.filter((c) => {
-    if (session?.user.role === "USER") return c.status !== "DRAFT";
-    if (session?.user.role === "INSURANCE")
-      return c.status !== "PENDING_INSURER_REVIEW";
+  // split sections
+  const draftClaims = filtered.filter(c => c.status === "DRAFT");
+  const pendingInsurer = filtered.filter(c => c.status === "PENDING_INSURER_REVIEW");
+  const pendingManager  = filtered.filter(c => c.status === "PENDING_MANAGER_REVIEW");
+  const otherClaims = filtered.filter(c => {
+    if (!isInsurer && !isManager) return c.status !== "DRAFT";
+    if (isInsurer) return c.status !== "PENDING_INSURER_REVIEW";
+    if (isManager) return c.status !== "PENDING_MANAGER_REVIEW";
     return true;
   });
 
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-6">
       <div className="max-w-6xl mx-auto">
-        {/* White “card” container */}
         <div className="bg-white rounded-xl shadow p-8 space-y-10">
-          {/* Header */}
           <header className="flex items-center justify-between">
             <h1 className="text-3xl font-bold text-gray-800">
               สวัสดี, {session?.user.name}
@@ -128,9 +114,9 @@ export default function DashboardPage() {
             <div className="flex items-center space-x-4">
               <input
                 type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="ค้นหา..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
                 className="border border-gray-300 px-3 py-1 rounded focus:outline-none focus:border-blue-500"
               />
               <Link
@@ -142,29 +128,36 @@ export default function DashboardPage() {
             </div>
           </header>
 
-          {/* non-insurers: see your drafts */}
-          {!isInsurer && (
+          {!isInsurer && !isManager && (
             <Section
-              title="ร่าง (Drafts)"
+              title="ร่าง (Draft)"
               claims={draftClaims}
               emptyText="ไม่มีร่างเคลม"
             />
           )}
 
-          {/* insurers: see pending-insurer first */}
           {isInsurer && (
             <Section
-              title="รอตรวจสอบประกัน (Pending Insurer Review)"
+              title="รอตรวจสอบประกัน (Pending Insurer)"
               claims={pendingInsurer}
-              emptyText="ไม่มีรายการรอตรวจสอบ"
+              emptyText="ไม่มีรอตรวจ"
             />
           )}
 
-          {/* everybody: then the rest */}
+          {isManager && (
+            <Section
+              title="รออนุมัติ (Pending Manager)"
+              claims={pendingManager}
+              emptyText="ไม่มีรออนุมัติ"
+            />
+          )}
+
           <Section
             title={
               isInsurer
                 ? "เคลมอื่น ๆ (ยกเว้น Draft & Pending Insurer)"
+                : isManager
+                ? "เคลมอื่น ๆ (ยกเว้น Draft & Pending Manager)"
                 : "เคลมอื่น ๆ (ยกเว้น Draft)"
             }
             claims={otherClaims}
@@ -176,7 +169,6 @@ export default function DashboardPage() {
   );
 }
 
-// List of statuses that should show the FPPA-04 link
 const fppaLinkStatuses = [
   "PENDING_MANAGER_REVIEW",
   "PENDING_USER_CONFIRM",
@@ -184,15 +176,9 @@ const fppaLinkStatuses = [
   "COMPLETED",
 ];
 
-function Section({
-  title,
-  claims,
-  emptyText,
-}: {
-  title: string;
-  claims: ClaimSummary[];
-  emptyText: string;
-}) {
+function Section({ title, claims, emptyText }:
+  { title: string; claims: ClaimSummary[]; emptyText: string }
+) {
   return (
     <section className="space-y-4">
       <h2 className="text-2xl font-semibold text-gray-700">{title}</h2>
@@ -213,7 +199,7 @@ function Section({
               </tr>
             </thead>
             <tbody>
-              {claims.map((c) => (
+              {claims.map(c => (
                 <tr key={c.id} className="hover:bg-gray-50 border-t">
                   <td className="px-6 py-3">
                     <Link
@@ -226,38 +212,20 @@ function Section({
                   <td className="px-6 py-3">{c.createdByName}</td>
                   <td className="px-6 py-3">{c.cause}</td>
                   <td className="px-6 py-3">
-                    {new Date(c.submittedAt || c.createdAt).toLocaleDateString(
-                      "th-TH"
-                    )}
+                    {new Date(c.submittedAt || c.createdAt).toLocaleDateString("th-TH")}
                   </td>
                   <td className="px-6 py-3">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColor(
-                        c.status
-                      )}`}
-                    >
-                      {c.status}
-                    </span>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColor(c.status)}`}>{c.status}</span>
                   </td>
                   <td className="px-6 py-3 text-sm text-gray-600">
-                    {c.insurerComment ? (
-                      <span className="block truncate max-w-xs">
-                        {c.insurerComment}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
+                    {c.insurerComment ? <span className="block truncate max-w-xs">{c.insurerComment}</span> : <span className="text-gray-400">—</span>}
                   </td>
                   <td className="px-6 py-3">
-                   {fppaLinkStatuses.includes(c.status) ? (
-                     <Link
-                       href={`/fppa04/${c.id}`}
-                       className="text-blue-600 hover:underline"                     >
-                       ดูฟอร์ม
-                     </Link>                   ) : (
-                    <span className="text-gray-400">—</span>
-                   )}
-                 </td>
+                    {fppaLinkStatuses.includes(c.status)
+                      ? <Link href={`/fppa04/${c.id}`} className="text-blue-600 hover:underline">ดูฟอร์ม</Link>
+                      : <span className="text-gray-400">—</span>
+                    }
+                  </td>
                 </tr>
               ))}
             </tbody>

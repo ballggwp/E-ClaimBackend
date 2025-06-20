@@ -437,7 +437,7 @@ export function ClaimForm({
                     <input
                       id={field}
                       type="file"
-                      accept=".jpg,.jpeg,.png,.pdf"
+                      accept=".jpg,.jpeg,.png,.pdf,.xlsx"
                       multiple
                       onChange={(e) => onFileChange(e, field)}
                       disabled={readOnly}
