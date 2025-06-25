@@ -79,6 +79,16 @@ export default function NewCpmPage() {
         const fileList = e.target.files;
         setFiles(f => ({ ...f, [field]: [...f[field], ...Array.from(fileList)] }));
     };
+    const handleFileRemove = (
+    field: 'damageFiles' | 'estimateFiles' | 'otherFiles',
+    idx: number
+  ) => {
+    setFiles(prev => ({
+      ...prev,
+      [field]: prev[field].filter((_, i) => i !== idx)
+    }))
+  }
+
 
     // Submit
     const onSubmit: React.ComponentProps<typeof CPMForm>["onSubmit"] = async (_, vals, f, saveAsDraft) => {
@@ -127,6 +137,7 @@ export default function NewCpmPage() {
             onHeaderChange={handleHeaderChange}
             values={values}
             onChange={handleChange}
+            onFileRemove={handleFileRemove}
             onFileChange={handleFileChange}
             onSubmit={onSubmit}
             approverList={approvers}

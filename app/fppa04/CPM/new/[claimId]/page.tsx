@@ -8,12 +8,11 @@ import FPPA04Form, { FPPA04CPMFormValues } from '@/components/FPPA04CPM'
 import Link from 'next/link'
 
 export default function NewFPPA04CPMPage() {
-  const { claimId }          = useParams()
+  const { claimId,cause }          = useParams()
   const router              = useRouter()
   const { data: session }   = useSession()
   const categoryMain        = 'Physical Assets'
   const categorySub         = 'CPM'
-  console.log(categoryMain,categorySub)
   const [defaults, setDefaults] = useState<{
     cause:        string
     approverName: string
@@ -23,47 +22,49 @@ export default function NewFPPA04CPMPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!session) return
-    ;(async () => {
-      setLoading(true)
+    if (!session) return;
+
+    const fetchData = async () => {
       try {
-        const headers = {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.user.accessToken}`,
-        }
+        setLoading(true);
 
-        // 1) CREATE the CPM record unconditionally
-        const createRes = await fetch(
-          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/fppa04`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              claimId,
-              categoryMain,  // <-- map to your Prisma fields
-              categorySub,
-            })
+        // 1) fetch the Claim → get the cause
+        const claimRes = await fetch(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/claims/${claimId}`,
+          { headers: { Authorization: `Bearer ${session.user.accessToken}` }}
+        );
+        if (!claimRes.ok) throw new Error(await claimRes.text());
+        const { claim } = await claimRes.json(); 
+        // claim.cpmForm.cause is your cause
+
+        // 2) upsert your FPPA04 base
+        let baseRes = await fetch(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/fppa04`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.user.accessToken}`,
+            },
+            body: JSON.stringify({ claimId, categoryMain, categorySub }),
           }
-        )
-        if (!createRes.ok) {
-          throw new Error(await createRes.text())
-        }
+        );
+        if (!baseRes.ok) throw new Error(await baseRes.text());
 
-        // 2) Now fetch the newly-created base + existing CPM form (if any)
-        const res2 = await fetch(
-          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/fppa04/${claimId}`, { headers }
-        )
-        if (!res2.ok) {
-          throw new Error(await res2.text())
-        }
+        // 3) fetch the FPPA04 base + variant if you need it
+        const f04Res = await fetch(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/fppa04/${claimId}`,
+          { headers: { Authorization: `Bearer ${session.user.accessToken}` }}
+        );
+        if (!f04Res.ok) throw new Error(await f04Res.text());
+        const { form } = await f04Res.json();
 
-        const { form, claim } = await res2.json()
-
-        // 3) seed your header defaults
+        // 4) now seed your defaults
         setDefaults({
-          cause:        claim.cause,
+          cause:        claim.cpmForm?.cause ?? "",
           approverName: claim.approverName,
           status:       claim.status,
-        })
+        });
 
         // 4) if we have variant data already (unlikely on first create), seed it too
         if (form) {
@@ -80,16 +81,16 @@ export default function NewFPPA04CPMPage() {
             policyNumber:     form.policyNumber,
             surveyorRefNumber:form.surveyorRefNumber,
             items:            form.items.map((i:any) => ({
-                                category:    i.category,
-                                description: i.description,
-                                total:       i.total.toString(),
-                                exception:   i.exception.toString(),
-                              })),
+                                  category:    i.category,
+                                  description: i.description,
+                                  total:       i.total.toString(),
+                                  exception:   i.exception.toString(),
+                                })),
             adjustments:      form.adjustments.map((a:any) => ({
-                                type:        a.type,
-                                description: a.description,
-                                amount:      a.amount.toString(),
-                              })),
+                                  type:        a.type,
+                                  description: a.description,
+                                  amount:      a.amount.toString(),
+                                })),
             signatureFiles:   [],
           })
         }
@@ -99,7 +100,9 @@ export default function NewFPPA04CPMPage() {
       } finally {
         setLoading(false)
       }
-    })()
+    };
+
+    fetchData();
   }, [session, claimId, categoryMain, categorySub])
 
   if (loading || !defaults) {
@@ -109,6 +112,7 @@ export default function NewFPPA04CPMPage() {
       </div>
     )
   }
+  
 
   return (
     <div className="min-h-screen bg-gray-100 py-8 px-4">
@@ -118,7 +122,7 @@ export default function NewFPPA04CPMPage() {
           <h2 className="text-lg font-medium text-gray-800">
             Claim ID: <span className="font-semibold">{claimId}</span>
           </h2>
-          <Link href={`/claims/${claimId}`} className="text-blue-600 hover:underline">
+          <Link href={`/claims/cpm/${claimId}`} className="text-blue-600 hover:underline">
             → ดู claims
           </Link>
         </div>

@@ -99,7 +99,9 @@ export default function NewClaimPage() {
           type="submit"
           className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded transition"
         >
-          ถัดไป: กรอกแบบฟอร์ม CPM
+          {categorySub
+            ? `ถัดไป: กรอกแบบฟอร์ม ${categorySub}`
+            : "ถัดไป: กรอกแบบฟอร์ม"}
         </button>
       </form>
     </div>

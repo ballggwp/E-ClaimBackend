@@ -161,11 +161,13 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
       .forEach(k => fd.append(k, vals[k]));
     vals.items.forEach(i => fd.append("items", JSON.stringify(i)));
     vals.adjustments.forEach(a => fd.append("adjustments", JSON.stringify(a)));
-    vals.signatureFiles.forEach(f => fd.append("signatureFiles", f));
+    vals.signatureFiles.forEach(f => {
+  fd.append("signatureFiles", f);   // ← each file under the same key
+});
     fd.append("netAmount", finalNet.toFixed(2));
 
     const res = await fetch(
-      `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/fppa04/${claimId}`,
+      `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/fppa04/${claimId}/cpm`,
       { method: "POST", headers: { Authorization: `Bearer ${session?.user.accessToken}` }, body: fd }
     );
     if (!res.ok) return Swal.fire('Error', await res.text(), 'error');
@@ -498,11 +500,59 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
       <input type="hidden" name="netAmount" value={finalNet.toFixed(2)} />
 
       {/* Signature upload */}
-      <div>
-        <label className="block mb-1 font-medium">Signature Files</label>
-        <input type="file" multiple onChange={onFile} disabled={!canEdit} className={inputClass(canEdit)} />
-      </div>
+<div>
+  <label className="block mb-1 font-medium">Signature Files</label>
+  <input
+    type="file"
+    multiple
+    name="signatureFiles"
+    onChange={onFile}
+    disabled={!canEdit}
+    className={inputClass(canEdit)}
+  />
 
+  {/* Preview gallery */}
+  <div className="mt-3 grid grid-cols-4 gap-2">
+    {vals.signatureFiles.map((file, idx) => {
+      const isImage = file.type.startsWith('image/');
+      const sizeKB = (file.size / 1024).toFixed(1);
+      return (
+        <div key={idx} className="relative p-2 border rounded bg-white">
+          {isImage ? (
+            <img
+              src={URL.createObjectURL(file)}
+              alt={file.name}
+              className="w-full h-24 object-contain mb-1"
+            />
+          ) : (
+            <div className="flex items-center justify-center h-24 text-4xl mb-1">
+              📄
+            </div>
+          )}
+          <div className="text-xs text-gray-700 truncate">
+            {file.name}
+          </div>
+          <div className="text-xs text-gray-500">
+            {sizeKB} KB
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setVals(v => {
+                const sigs = [...v.signatureFiles];
+                sigs.splice(idx, 1);
+                return { ...v, signatureFiles: sigs };
+              });
+            }}
+            className="absolute top-1 right-1 text-red-600 hover:text-red-800"
+          >
+            ✕
+          </button>
+        </div>
+      );
+    })}
+  </div>
+</div>
       {/* Submit */}
       {canEdit && (
         <div className="text-right">

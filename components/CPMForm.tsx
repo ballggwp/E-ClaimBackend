@@ -47,6 +47,10 @@ interface CPMFormProps {
     e: ChangeEvent<HTMLInputElement>,
     field: "damageFiles" | "estimateFiles" | "otherFiles"
   ) => void;
+  onFileRemove: (
+    field: "damageFiles" | "estimateFiles" | "otherFiles",
+    index: number
+  ) => void;               // ← เพิ่มตรงนี้
   onSubmit: CPMSubmitHandler;
   approverList: User[];
   submitting: boolean;
@@ -66,6 +70,7 @@ export default function CPMForm({
   values,
   onChange,
   onFileChange,
+  onFileRemove,
   onSubmit,
   approverList,
   submitting,
@@ -426,65 +431,89 @@ export default function CPMForm({
 
         {/* Attachments */}
         {!readOnly && (
-        <fieldset className="border-t pt-6 space-y-6">
-          <legend className="font-semibold text-lg">แนบเอกสารตามรายการ</legend>
+         <fieldset className="border-t pt-6 space-y-6">
+      <legend className="font-semibold text-lg">แนบเอกสารตามรายการ</legend>
 
-          {(["damageFiles", "estimateFiles", "otherFiles"] as const).map(
-            (field, idx) => {
-              const label =
-                field === "damageFiles"
-                  ? "1) รูปภาพความเสียหาย"
-                  : field === "estimateFiles"
-                  ? "2) เอกสารสำรวจความเสียหาย"
-                  : "3) เอกสารเพิ่มเติมอื่น ๆ";
-              return (
-                <div key={field}>
-                  <label className="block mb-2 font-medium">
-                    {label}
-                    {idx < 2 && <span className="text-red-600">*</span>}{" "}
-                    (jpeg/jpg/png/pdf)
-                  </label>
-                  <label
-                    htmlFor={field }
-                    className="group flex flex-col items-center justify-center border-2 border-dashed border-gray-300 hover:border-blue-500 bg-white p-6 rounded-xl shadow-sm cursor-pointer transition-all"
-                  >
-                    <svg
-                      className="w-8 h-8 text-gray-400 group-hover:text-blue-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      
-                    >
-                      <path d="M12 4v16m8-8H4" strokeWidth={2} />
-                    </svg>
-                    <span className="mt-2 text-gray-600 group-hover:text-blue-600 text-sm">
-                      คลิกหรือวางไฟล์ที่นี่
-                    </span>
-                    <input
-                      id={field}
-                      type="file"
-                      accept=".jpg,.jpeg,.png,.pdf,.xlsx"
-                      multiple
-                      onChange={(e) => onFileChange(e, field)}
-                      disabled={readOnly}
-                      className="hidden"
-                    />
-                  </label>
-                  {files[field].length > 0 && (
-                    <ul className="mt-2 text-sm text-gray-700 space-y-1 border-l-2 border-blue-200 pl-3">
-                      {files[field].map((f) => (
-                        <li key={f.name} className="flex items-center">
-                          📎
-                          <span className="ml-2">{f.name}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              );
-            }
+      {( ["damageFiles", "estimateFiles", "otherFiles"] as const ).map(
+        (field, idx) => {
+          const label =
+            field === "damageFiles"
+              ? "1) รูปภาพความเสียหาย"
+              : field === "estimateFiles"
+              ? "2) เอกสารสำรวจความเสียหาย"
+              : "3) เอกสารเพิ่มเติมอื่น ๆ";
+
+          return (
+            <div key={field}>
+              <label className="block mb-2 font-medium">
+                {label} {idx < 2 && <span className="text-red-600">*</span>}
+              </label>
+
+              {/* Dropzone-like */}
+              <label
+                htmlFor={field}
+                className="group flex flex-col items-center justify-center border-2 border-dashed border-gray-300 hover:border-blue-500 bg-white p-6 rounded-xl shadow-sm cursor-pointer transition-all"
+              >
+                <svg
+                  className="w-8 h-8 text-gray-400 group-hover:text-blue-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12 4v16m8-8H4" strokeWidth={2} />
+                </svg>
+                <span className="mt-2 text-gray-600 group-hover:text-blue-600 text-sm">
+                  คลิกหรือวางไฟล์ที่นี่
+                </span>
+                <input
+                  id={field}
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.pdf"
+                  multiple
+                  onChange={e => onFileChange(e, field)}
+                  className="hidden"
+                />
+              </label>
+
+              {/* List ไฟล์ที่เลือก พร้อมปุ่มลบ */}
+              {files[field].length > 0 && (
+  <ul className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+    {files[field].map((f, i) => {
+      const isImage = f.type.startsWith('image/');
+      const previewUrl = isImage ? URL.createObjectURL(f) : null;
+      return (
+        <li key={`${field}-${i}`} className="flex items-center space-x-2 bg-gray-50 p-2 rounded">
+          {isImage ? (
+            <img src={previewUrl!}
+                 alt={f.name}
+                 className="w-12 h-12 object-cover rounded" />
+          ) : (
+            <span className="w-12 h-12 flex items-center justify-center bg-gray-200 text-gray-600 rounded">
+              📄
+            </span>
           )}
-        </fieldset>
+          <div className="flex-1 truncate">
+            <p className="text-sm font-medium">{f.name}</p>
+            <p className="text-xs text-gray-500">{(f.size/1024).toFixed(1)} KB</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onFileRemove(field, i)}
+            className="text-gray-500 hover:text-red-600"
+            aria-label="Remove file"
+          >
+            ✕
+          </button>
+        </li>
+      );
+    })}
+  </ul>
+              )}
+            </div>
+          );
+        }
+      )}
+    </fieldset>
         )}
 
         {/* Buttons */}

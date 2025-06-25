@@ -157,6 +157,15 @@ export default function ClaimDetailPage() {
       [field]: [...prev[field], ...Array.from(e.target.files!)],
     }));
   };
+  const handleFileRemove = (
+    field: 'damageFiles' | 'estimateFiles' | 'otherFiles',
+    idx: number
+  ) => {
+    setFiles(prev => ({
+      ...prev,
+      [field]: prev[field].filter((_, i) => i !== idx)
+    }))
+  }
 
   const handleSubmit = async (
     vals: CPMFormValues,
@@ -264,6 +273,7 @@ const noop = () => { /* no-op in read-only */ };
   files={files}
   onChange={(e) => setValues(v => ({ ...v, [e.target.name]: e.target.value }))}
   onFileChange={handleFileChange}
+  onFileRemove={handleFileRemove}
   onSubmit={wrappedOnSubmit}
   approverList={approvers}
   submitting={submitting}
