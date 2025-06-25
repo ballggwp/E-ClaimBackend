@@ -1,5 +1,3 @@
-// prisma/schema.prisma
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -27,11 +25,6 @@ enum AttachmentType {
   OTHER_DOCUMENT
 }
 
-enum Fppa04ItemCategory {
-  COMPENSATION
-  DEDUCTION
-}
-
 enum Role {
   USER
   MANAGER
@@ -41,51 +34,71 @@ enum Role {
 model User {
   id            String   @id @default(uuid())
   email         String   @unique
+  employeeNumber  String    @unique
   name          String
-  password      String
   role          Role     @default(USER)
-  position      String?  // all roles can have a position
-  
-  // one-to-many: users → claims they created
-  claimsCreated Claim[]  @relation("ClaimsCreated")
-  
-  // one-to-many: users → claims they must approve
-  claimsToSign  Claim[]  @relation("ClaimsApprover")
-  
+  position      String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  claimsCreated Claim[]  @relation("ClaimsCreated")
+  claimsToSign  Claim[]  @relation("ClaimsApprover")
 }
 
 model Claim {
-  id               String       @id @default(cuid())
-  createdByName    String
-  approverName     String
-  // references the user who filed it
-  createdById      String
-  createdBy        User         @relation("ClaimsCreated", fields: [createdById], references: [id])
+  id           String   @id @default(uuid())
+  docNum       String   @unique
+  createdByName  String
+  approverName   String
+  createdById    String
+  createdBy      User         @relation("ClaimsCreated", fields: [createdById], references: [id])
+  approverId     String
+  approver       User         @relation("ClaimsApprover", fields: [approverId], references: [id])
 
-  // references the user who must approve it
-  approverId       String
-  approver         User         @relation("ClaimsApprover", fields: [approverId], references: [id])
+  status         ClaimStatus  @default(DRAFT)
+  categoryMain   String?
+  categorySub    String?
+  submittedAt    DateTime?
+  insurerComment String?
 
-  status           ClaimStatus  @default(DRAFT)
-  insurerComment   String?
-  submittedAt      DateTime?
+  attachments    Attachment[] @relation("ClaimAttachments")
+  cpmForm        CPMForm?
+  fppa04Base     Fppa04Base?
 
-  accidentDate     DateTime
-  accidentTime     String
-  location         String
-  cause            String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
 
-  policeDate       DateTime?
-  policeTime       String?
-  policeStation    String?
+model Attachment {
+  id         String         @id @default(cuid())
+  claimId    String
+  type       AttachmentType
+  fileName   String
+  url        String
+  uploadedAt DateTime       @default(now())
 
-  damageOwnType    String
-  damageOtherOwn   String?
-  damageAmount     Float?
-  damageDetail     String?
-  victimDetail     String?
+  claim      Claim          @relation("ClaimAttachments", fields: [claimId], references: [id])
+}
+
+model CPMForm {
+  claimId        String   @id
+  claim          Claim    @relation(fields: [claimId], references: [id])
+
+  accidentDate   DateTime
+  accidentTime   String
+  location       String
+  cause          String
+  repairShop     String? 
+
+  policeDate     DateTime?
+  policeTime     String?
+  policeStation  String?
+
+  damageOwnType  String
+  damageOtherOwn String?
+  damageDetail   String?
+  damageAmount   Float?
+  victimDetail   String?
 
   partnerName         String?
   partnerPhone        String?
@@ -94,66 +107,65 @@ model Claim {
   partnerDamageAmount Float?
   partnerVictimDetail String?
 
-  // attachments (1-M)
-  attachments     Attachment[] @relation("ClaimAttachments")
-
-  // optional 1-1 FPPA-04 form
-  fppa04          Fppa04?
-
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
-model Attachment {
-  id         String         @id @default(cuid())
-  claimId    String
-  claim      Claim          @relation("ClaimAttachments", fields: [claimId], references: [id])
-  type       AttachmentType
-  fileName   String
-  url        String
-  uploadedAt DateTime       @default(now())
+model Fppa04Base {
+  id        String   @id @default(cuid())
+  claimId   String   @unique
+  mainType  String
+  subType   String
+  claim     Claim    @relation(fields: [claimId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cpmVariant Fppa04CPM?
 }
 
-model Fppa04 {
-  id                  String                @id @default(cuid())
-  claimId             String                @unique
-  claim               Claim                 @relation(fields: [claimId], references: [id])
+model Fppa04CPM {
+  baseId            String       @id
+  base              Fppa04Base   @relation(fields: [baseId], references: [id])
 
-  eventType           String                // ประเภทกรมธรรม์
-  claimRefNumber      String                // หมายเลขรับ Claim
-  eventDescription    String                // เหตุการณ์
-  productionYear      Int                   // ปีรถที่ผลิต
-  accidentDate        DateTime              // วันที่เกิดเหตุ
-  reportedDate        DateTime              // วันที่รับแจ้ง
-  receivedDocDate     DateTime              // วันที่ได้รับเอกสาร
-  company             String                // บริษัท
-  factory             String                // โรงงาน
-  policyNumber        String                // เลขที่กรมธรรม์
-  surveyorRefNumber   String                // เลขที่ Claim Surveyor
-  netAmount           Float
-  items               Fppa04Item[]          @relation("Fppa04Items")
-  adjustments         Fppa04Adjustment[]    @relation("Fppa04Adjustments")
-  signatureFiles      String[]              // เก็บเป็น array ของ URL
+  eventType         String
+  claimRefNumber    String
+  eventDescription  String
+  productionYear    Int
+  accidentDate      DateTime
+  reportedDate      DateTime
+  receivedDocDate   DateTime
+  company           String
+  factory           String
+  policyNumber      String
+  surveyorRefNumber String
+  netAmount         Float
+  signatureFiles    String[]
 
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  items         Fppa04ItemCPM[]       @relation("Fppa04CPMItems")
+  adjustments   Fppa04AdjustmentCPM[] @relation("Fppa04CPMAdjustments")
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
-model Fppa04Item {
-  id          String  @id @default(cuid())
-  fppa04Id    String
-  fppa04      Fppa04  @relation("Fppa04Items", fields: [fppa04Id], references: [id])
+model Fppa04ItemCPM {
+  id          String     @id @default(cuid())
+  baseId      String
+  variant     Fppa04CPM  @relation("Fppa04CPMItems", fields: [baseId], references: [baseId])
+
   category    String
   description String
   total       Float
   exception   Float
 }
 
-model Fppa04Adjustment {
-  id          String  @id @default(cuid())
-  fppa04Id    String
-  fppa04      Fppa04  @relation("Fppa04Adjustments", fields: [fppa04Id], references: [id])
-  type        String  // "บวก" หรือ "หัก"
+model Fppa04AdjustmentCPM {
+  id          String     @id @default(cuid())
+  baseId      String
+  variant     Fppa04CPM  @relation("Fppa04CPMAdjustments", fields: [baseId], references: [baseId])
+
+  type        String
   description String
   amount      Float
 }

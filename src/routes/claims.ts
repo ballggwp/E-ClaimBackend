@@ -1,33 +1,74 @@
-import { Router }   from 'express'
-import authMiddleware from '../middleware/authMiddleware'
-import { listClaims, createClaim,getClaim,updateClaim,claimAction } from '../controllers/claimController'
-import multer from 'multer'
-import { ManagerAction } from '../controllers/claimController'
-const upload = multer({ dest: 'temp/' })
-const router = Router()
+// src/routes/claims.ts
+import express from "express";
+import multer from "multer";
+import * as claimCtl from "../controllers/claimController";
+import { ensureAuth, ensureRole } from "../middleware/authMiddleware";
 
-// ตรงนี้จะไม่ error แล้ว
-router.use(authMiddleware)
-router.get("/:id", getClaim);
-router.get('/', listClaims)
-router.put  ('/:id',   upload.fields([
-  { name: 'damageFiles'   },
-  { name: 'estimateFiles' },
-  { name: 'otherFiles'    }
-]), updateClaim)
-router.post(
-  '/',
-  upload.fields([
-    { name: 'damageFiles' },
-    { name: 'estimateFiles' },
-    { name: 'otherFiles' },
-  ]),
-  createClaim
-)
-router.post("/:id/action", claimAction);
-router.patch(
-  '/api/claims/:id/review',
-  ManagerAction
+const router = express.Router();
+const upload = multer({ dest: "uploads/" });
+// List & filter claims
+router.get(
+  "/",
+  ensureAuth,
+  claimCtl.listClaims
 );
 
-export default router
+// Create a new claim — now req.user is guaranteed
+router.post(
+  "/",
+  ensureAuth,
+  claimCtl.createClaim
+);
+
+// Get one claim
+router.get(
+  "/:id",
+  ensureAuth,
+  claimCtl.getClaim
+);
+
+// Update header + nested CPM upsert
+router.patch(
+  "/:id",
+  ensureAuth,
+  claimCtl.updateClaim
+);
+
+// Insurance actions
+router.post(
+  "/:id/action",
+  ensureAuth,
+  ensureRole("INSURANCE"),
+  claimCtl.claimAction
+);
+
+// Manager actions
+router.post(
+  "/:id/manager",
+  ensureAuth,
+  ensureRole("MANAGER"),
+  claimCtl.ManagerAction
+);
+
+// Create CPM form
+router.post(
+  "/:claimId/cpm",
+  ensureAuth,
+  upload.fields([
+    { name: "damageFiles" },
+    { name: "estimateFiles" },
+    { name: "otherFiles" },
+  ]),
+  claimCtl.createCpmForm
+);
+router.put(
+  "/:claimId/cpm",
+  ensureAuth,
+  upload.fields([
+    { name: "damageFiles" },
+    { name: "estimateFiles" },
+    { name: "otherFiles" },
+  ]),
+  claimCtl.updateCpmForm
+);
+export default router;

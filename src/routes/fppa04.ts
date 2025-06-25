@@ -1,36 +1,38 @@
-// routes/fppa04.ts
-import { Router } from 'express'
-import multer from 'multer'
-import path from 'path'
-import { upsertFppa04, getFppa04, listPendingFppa04 } from '../controllers/fppa04Controller'
+import express from "express";
+import * as f04 from "../controllers/fppa04Controller";
 
-const router = Router()
+const router = express.Router();
 
-// store files under /public/uploads, keep original extension
-const storage = multer.diskStorage({
-  destination: path.join(__dirname, '../public/uploads'),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname)
-    const name = path.basename(file.originalname, ext)
-      .replace(/\s+/g,'_')
-      .slice(0,100)
-    cb(null, `${name}_${Date.now()}${ext}`)
-  }
-})
+// FPPA‐04 base (links a Claim to an FPPA record)
+// POST   /api/fppa04            → create base
+// GET    /api/fppa04/:id        → read base + variant+items+adjustments
+// PATCH  /api/fppa04/:id        → update base
+router.post  ("/",         f04.createFppa04Base);
+router.get   ("/:id",      f04.getFppa04Base);
+router.patch ("/:id",      f04.updateFppa04Base);
 
-const upload = multer({ storage })
+// CPM variant under that base
+// POST   /api/fppa04/:id/cpm  → create CPM variant
+// PATCH  /api/fppa04/:id/cpm  → update CPM variant
+router.post  ("/:id/cpm",         f04.createFppa04Cpm);
+router.patch ("/:id/cpm",          f04.updateFppa04Cpm);
 
-router.get  ('/:claimId', getFppa04)
-router.post ('/:claimId',
-  upload.array('signatureFiles', 5),
-  upsertFppa04
-)
-// optionally also support PUT:
-router.put  ('/:claimId',
-  upload.array('signatureFiles', 5),
-  upsertFppa04
-)
+// Items under the CPM variant
+// POST   /api/fppa04/:id/items          → add item
+// PATCH  /api/fppa04/:id/items/:itemId  → update item
+// DELETE /api/fppa04/:id/items/:itemId  → delete item
+router.post   ("/:id/items",             f04.addFppa04Item);
+router.patch  ("/:id/items/:itemId",     f04.updateFppa04Item);
+router.delete ("/:id/items/:itemId",     f04.deleteFppa04Item);
 
-router.get  ('/', listPendingFppa04)
+// Adjustments under the CPM variant
+// POST   /api/fppa04/:id/adjustments         → add adjustment
+// PATCH  /api/fppa04/:id/adjustments/:adjId  → update adjustment
+// DELETE /api/fppa04/:id/adjustments/:adjId  → delete adjustment
+router.post   ("/:id/adjustments",              f04.addFppa04Adjustment);
+router.patch  ("/:id/adjustments/:adjId",       f04.updateFppa04Adjustment);
+router.delete ("/:id/adjustments/:adjId",       f04.deleteFppa04Adjustment);
 
-export default router
+
+router.get("/", f04.listFppa04)
+export default router;

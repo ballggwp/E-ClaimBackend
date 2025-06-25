@@ -1,2 +1,0 @@
--- AlterEnum
-ALTER TYPE "ClaimStatus" ADD VALUE 'PENDING_INSURER_FORM';

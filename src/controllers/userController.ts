@@ -5,10 +5,18 @@ import prisma from '../lib/prisma'
 export const listUsers: RequestHandler = async (_req, res, next) => {
   try {
     const users = await prisma.user.findMany({
-      select: { id: true, name: true, email: true, role: true,password:true ,position:true },
-    })
-    res.json({ users })
+      select: { 
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        position: true,
+        employeeNumber: true
+      },
+    });
+    res.json({ users });
   } catch (err) {
-    next(err)
+    next(err);
   }
 }
+
