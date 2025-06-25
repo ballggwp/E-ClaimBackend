@@ -104,93 +104,98 @@ export const updateFppa04Base: RequestHandler = async (req, res, next) => {
 // POST   /api/fppa04/:id/cpm
 export const createFppa04Cpm: RequestHandler = async (req, res, next) => {
   try {
-    const baseId = req.params.id;
-    const body = req.body as {
-      eventType: string;
-      claimRefNumber: string;
-      eventDescription: string;
-      productionYear: number;
-      accidentDate: string;
-      reportedDate: string;
-      receivedDocDate: string;
-      company: string;
-      factory: string;
-      policyNumber: string;
-      surveyorRefNumber: string;
-      netAmount: number;
-      signatureFiles: string[];
+    const claimId = req.params.id;
+
+    // 1) Look up the base record
+    const base = await prisma.fppa04Base.findUnique({
+      where: { claimId },
+      select: { id: true },
+    });
+    if (!base) {
+      res.status(404).json({ message: "FPPA-04 base not found" });
+      return;
+    }
+
+    // 2) Parse items & adjustments (JSON-encoded arrays)
+    const parseArray = <T>(raw: any): T[] =>
+      ([] as any[]).concat(raw || []).map(s => JSON.parse(s) as T);
+
+    const items = parseArray<{
+      category: string;
+      description: string;
+      total: number | string;
+      exception: number | string;
+    }>(req.body.items);
+
+    const adjustments = parseArray<{
+      type: string;
+      description: string;
+      amount: number | string;
+    }>(req.body.adjustments);
+
+    // 3) Collect all uploaded signature files:
+    //    multer put them in req.files as an array
+    const files = Array.isArray(req.files)
+      ? (req.files as Express.Multer.File[])
+      : [];
+    // now map to your public URL or relative path:
+    const signatureFiles = files.map(f => `/uploads/${f.filename}`); 
+
+    // 4) Build upsert payload
+    const payload = {
+      baseId:            base.id,
+      eventType:         req.body.eventType,
+      claimRefNumber:    req.body.claimRefNumber,
+      eventDescription:  req.body.eventDescription,
+      productionYear:    Number(req.body.productionYear),
+      accidentDate:      new Date(req.body.accidentDate),
+      reportedDate:      new Date(req.body.reportedDate),
+      receivedDocDate:   new Date(req.body.receivedDocDate),
+      company:           req.body.company,
+      factory:           req.body.factory,
+      policyNumber:      req.body.policyNumber,
+      surveyorRefNumber: req.body.surveyorRefNumber,
+      netAmount:         parseFloat(req.body.netAmount),
+      signatureFiles, 
+      items: {
+        create: items.map(i => ({
+          category:    i.category,
+          description: i.description,
+          total:       parseFloat(String(i.total)),
+          exception:   parseFloat(String(i.exception)),
+        })),
+      },
+      adjustments: {
+        create: adjustments.map(a => ({
+          type:        a.type,
+          description: a.description,
+          amount:      parseFloat(String(a.amount)),
+        })),
+      },
     };
 
-    const variant = await prisma.fppa04CPM.create({
-      data: {
-        baseId,
-        eventType:         body.eventType,
-        claimRefNumber:    body.claimRefNumber,
-        eventDescription:  body.eventDescription,
-        productionYear:    body.productionYear,
-        accidentDate:      new Date(body.accidentDate),
-        reportedDate:      new Date(body.reportedDate),
-        receivedDocDate:   new Date(body.receivedDocDate),
-        company:           body.company,
-        factory:           body.factory,
-        policyNumber:      body.policyNumber,
-        surveyorRefNumber: body.surveyorRefNumber,
-        netAmount:         body.netAmount,
-        signatureFiles:    body.signatureFiles,
+    // 5) Upsert the CPM record
+    const cpm = await prisma.fppa04CPM.upsert({
+      where: { baseId: base.id },
+      create: payload,
+      update: {
+        // if updating signatureFiles, you could merge old + new:
+        signatureFiles
+      },
+      include: {
+        items:       true,
+        adjustments: true,
       },
     });
 
-    res.status(201).json({ variant });
+    res.json({ cpm });
   } catch (err) {
     next(err);
   }
 };
 
-// PATCH  /api/fppa04/:id/cpm
-export const updateFppa04Cpm: RequestHandler = async (req, res, next) => {
-  try {
-    const baseId = req.params.id;
-    const body = req.body as Partial<{
-      eventType: string;
-      claimRefNumber: string;
-      eventDescription: string;
-      productionYear: number;
-      accidentDate: string;
-      reportedDate: string;
-      receivedDocDate: string;
-      company: string;
-      factory: string;
-      policyNumber: string;
-      surveyorRefNumber: string;
-      netAmount: number;
-      signatureFiles: string[];
-    }>;
 
-    const data: Prisma.Fppa04CPMUpdateInput = {
-      ...(body.eventType         && { eventType: body.eventType }),
-      ...(body.claimRefNumber    && { claimRefNumber: body.claimRefNumber }),
-      ...(body.eventDescription  && { eventDescription: body.eventDescription }),
-      ...(body.productionYear    !== undefined && { productionYear: body.productionYear }),
-      ...(body.accidentDate      && { accidentDate: new Date(body.accidentDate) }),
-      ...(body.reportedDate      && { reportedDate: new Date(body.reportedDate) }),
-      ...(body.receivedDocDate   && { receivedDocDate: new Date(body.receivedDocDate) }),
-      ...(body.company           && { company: body.company }),
-      ...(body.factory           && { factory: body.factory }),
-      ...(body.policyNumber      && { policyNumber: body.policyNumber }),
-      ...(body.surveyorRefNumber && { surveyorRefNumber: body.surveyorRefNumber }),
-      ...(body.netAmount         !== undefined && { netAmount: body.netAmount }),
-      ...(body.signatureFiles    && { signatureFiles: body.signatureFiles }),
-    };
 
-    const updated = await prisma.fppa04CPM.update({
-      where: { baseId },
-      data,
-    });
-    res.json({ variant: updated });
-  } catch (err) {
-    next(err);
-  }
-};
 
 // ─── Items CRUD under CPM Variant ──────────────────────────────────────────────
 // POST   /api/fppa04/:id/items

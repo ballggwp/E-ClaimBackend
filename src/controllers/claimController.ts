@@ -144,7 +144,11 @@ export const getClaim: RequestHandler = async (req, res, next) => {
       res.status(404).json({ message: "Not found" });
       return;
     }
-    res.json({ claim });
+    const claimWithCause = {
+      ...claim.cpmForm,
+      cause: claim.cpmForm?.cause ?? "",
+    };
+    res.json({ claim, claimWithCause });
   } catch (err) {
     next(err);
   }

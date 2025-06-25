@@ -1,8 +1,9 @@
 import express from "express";
 import * as f04 from "../controllers/fppa04Controller";
-
+import multer from "multer";
+import path from "path";
 const router = express.Router();
-
+const upload = multer({ dest: "uploads/" });
 // FPPA‐04 base (links a Claim to an FPPA record)
 // POST   /api/fppa04            → create base
 // GET    /api/fppa04/:id        → read base + variant+items+adjustments
@@ -14,9 +15,16 @@ router.patch ("/:id",      f04.updateFppa04Base);
 // CPM variant under that base
 // POST   /api/fppa04/:id/cpm  → create CPM variant
 // PATCH  /api/fppa04/:id/cpm  → update CPM variant
-router.post  ("/:id/cpm",         f04.createFppa04Cpm);
-router.patch ("/:id/cpm",          f04.updateFppa04Cpm);
-
+router.post(
+  "/:id/cpm",
+  upload.array("signatureFiles", 10),
+  f04.createFppa04Cpm
+);
+router.patch(
+  '/:id/cpm',
+  upload.array("signatureFiles",10),
+  f04.createFppa04Cpm
+);
 // Items under the CPM variant
 // POST   /api/fppa04/:id/items          → add item
 // PATCH  /api/fppa04/:id/items/:itemId  → update item
