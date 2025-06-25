@@ -1,3 +1,4 @@
+// app/dashboard/page.tsx
 "use client";
 
 import { useSession } from "next-auth/react";
@@ -7,7 +8,8 @@ import Link from "next/link";
 
 interface ClaimSummary {
   id: string;
-  cause: string;
+  docNum:string;
+  cause?: string | null;    // now optional / nullable
   status: string;
   submittedAt: string;
   createdAt: string;
@@ -38,6 +40,13 @@ const statusColor = (status: string) => {
   }
 };
 
+const fppaLinkStatuses = [
+  "PENDING_MANAGER_REVIEW",
+  "PENDING_USER_CONFIRM",
+  "AWAITING_SIGNATURES",
+  "COMPLETED",
+];
+
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -50,12 +59,14 @@ export default function DashboardPage() {
   const isInsurer = session?.user.role === "INSURANCE";
   const isManager = session?.user.role === "MANAGER";
 
+  // Redirect if not logged in
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
     }
   }, [status, router]);
 
+  // Fetch claims
   useEffect(() => {
     if (status !== "authenticated") return;
     (async () => {
@@ -68,8 +79,8 @@ export default function DashboardPage() {
           headers: { Authorization: `Bearer ${session!.user.accessToken}` }
         });
         if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        setClaims(data.claims);
+        const { claims } = await res.json();
+        setClaims(claims);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -78,28 +89,34 @@ export default function DashboardPage() {
     })();
   }, [status, session, isInsurer, isManager]);
 
+  // Filtered list
   const filtered = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    return term === ""
-      ? claims
-      : claims.filter(c =>
-          c.id.toLowerCase().includes(term) ||
-          c.cause.toLowerCase().includes(term) ||
-          c.status.toLowerCase().includes(term)
-        );
+    if (term === "") return claims;
+    return claims.filter(c =>
+      c.docNum.toLowerCase().includes(term) ||
+      (c.cause?.toLowerCase().includes(term) ?? false) ||
+      c.status.toLowerCase().includes(term)||
+      c.insurerComment?.toLowerCase().includes(term)||
+      c.submittedAt.toLowerCase().includes(term)
+    );
   }, [searchTerm, claims]);
 
-  if (status === "loading" || loading) return <p className="p-6">Loading…</p>;
-  if (error) return <p className="p-6 text-red-600">Error: {error}</p>;
+  if (status === "loading" || loading) {
+    return <p className="p-6">Loading…</p>;
+  }
+  if (error) {
+    return <p className="p-6 text-red-600">Error: {error}</p>;
+  }
 
-  // split sections
-  const draftClaims = filtered.filter(c => c.status === "DRAFT");
+  // Section splits
+  const draftClaims    = filtered.filter(c => c.status === "DRAFT");
   const pendingInsurer = filtered.filter(c => c.status === "PENDING_INSURER_REVIEW");
-  const pendingManager  = filtered.filter(c => c.status === "PENDING_MANAGER_REVIEW");
-  const otherClaims = filtered.filter(c => {
+  const pendingManager = filtered.filter(c => c.status === "PENDING_MANAGER_REVIEW");
+  const otherClaims    = filtered.filter(c => {
     if (!isInsurer && !isManager) return c.status !== "DRAFT";
-    if (isInsurer) return c.status !== "PENDING_INSURER_REVIEW";
-    if (isManager) return c.status !== "PENDING_MANAGER_REVIEW";
+    if (isInsurer)   return c.status !== "PENDING_INSURER_REVIEW";
+    if (isManager)   return c.status !== "PENDING_MANAGER_REVIEW";
     return true;
   });
 
@@ -129,35 +146,18 @@ export default function DashboardPage() {
           </header>
 
           {!isInsurer && !isManager && (
-            <Section
-              title="ร่าง (Draft)"
-              claims={draftClaims}
-              emptyText="ไม่มีร่างเคลม"
-            />
+            <Section title="ร่าง (Draft)" claims={draftClaims} emptyText="ไม่มีร่างเคลม" />
           )}
-
           {isInsurer && (
-            <Section
-              title="รอตรวจสอบประกัน (Pending Insurer)"
-              claims={pendingInsurer}
-              emptyText="ไม่มีรอตรวจ"
-            />
+            <Section title="รอตรวจสอบประกัน (Pending Insurer)" claims={pendingInsurer} emptyText="ไม่มีรอตรวจ" />
           )}
-
           {isManager && (
-            <Section
-              title="รออนุมัติ (Pending Manager)"
-              claims={pendingManager}
-              emptyText="ไม่มีรออนุมัติ"
-            />
+            <Section title="รออนุมัติ (Pending Manager)" claims={pendingManager} emptyText="ไม่มีรออนุมัติ" />
           )}
-
           <Section
             title={
-              isInsurer
-                ? "เคลมอื่น ๆ (ยกเว้น Draft & Pending Insurer)"
-                : isManager
-                ? "เคลมอื่น ๆ (ยกเว้น Draft & Pending Manager)"
+              isInsurer ? "เคลมอื่น ๆ (ยกเว้น Draft & Pending Insurer)"
+                : isManager ? "เคลมอื่น ๆ (ยกเว้น Draft & Pending Manager)"
                 : "เคลมอื่น ๆ (ยกเว้น Draft)"
             }
             claims={otherClaims}
@@ -169,16 +169,15 @@ export default function DashboardPage() {
   );
 }
 
-const fppaLinkStatuses = [
-  "PENDING_MANAGER_REVIEW",
-  "PENDING_USER_CONFIRM",
-  "AWAITING_SIGNATURES",
-  "COMPLETED",
-];
-
-function Section({ title, claims, emptyText }:
-  { title: string; claims: ClaimSummary[]; emptyText: string }
-) {
+function Section({
+  title,
+  claims,
+  emptyText,
+}: {
+  title: string;
+  claims: ClaimSummary[];
+  emptyText: string;
+}) {
   return (
     <section className="space-y-4">
       <h2 className="text-2xl font-semibold text-gray-700">{title}</h2>
@@ -202,29 +201,39 @@ function Section({ title, claims, emptyText }:
               {claims.map(c => (
                 <tr key={c.id} className="hover:bg-gray-50 border-t">
                   <td className="px-6 py-3">
-                    <Link
-                      href={`/claims/${c.id}`}
-                      className="text-blue-600 hover:underline"
-                    >
-                      {c.id}
+                    <Link href={`/claims/cpm/${c.id}`} className="text-blue-600 hover:underline">
+                      {c.docNum}
                     </Link>
                   </td>
                   <td className="px-6 py-3">{c.createdByName}</td>
-                  <td className="px-6 py-3">{c.cause}</td>
+                  <td className="px-6 py-3">
+                    {c.cause ?? <span className="text-gray-400">—</span>}
+                  </td>
                   <td className="px-6 py-3">
                     {new Date(c.submittedAt || c.createdAt).toLocaleDateString("th-TH")}
                   </td>
                   <td className="px-6 py-3">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColor(c.status)}`}>{c.status}</span>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColor(c.status)}`}
+                    >
+                      {c.status}
+                    </span>
                   </td>
                   <td className="px-6 py-3 text-sm text-gray-600">
-                    {c.insurerComment ? <span className="block truncate max-w-xs">{c.insurerComment}</span> : <span className="text-gray-400">—</span>}
+                    {c.insurerComment ? (
+                      <span className="block truncate max-w-xs">{c.insurerComment}</span>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
                   </td>
                   <td className="px-6 py-3">
-                    {fppaLinkStatuses.includes(c.status)
-                      ? <Link href={`/fppa04/${c.id}`} className="text-blue-600 hover:underline">ดูฟอร์ม</Link>
-                      : <span className="text-gray-400">—</span>
-                    }
+                    {fppaLinkStatuses.includes(c.status) ? (
+                      <Link href={`/fppa04/${c.id}`} className="text-blue-600 hover:underline">
+                        ดูฟอร์ม
+                      </Link>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
                   </td>
                 </tr>
               ))}

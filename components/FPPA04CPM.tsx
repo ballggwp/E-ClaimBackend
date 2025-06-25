@@ -1,4 +1,4 @@
-// components/FPPA04Form.tsx
+// components/FPPA04CPMForm.tsx
 "use client";
 
 import { useParams } from "next/navigation";
@@ -7,20 +7,20 @@ import { useSession } from "next-auth/react";
 import Swal from "sweetalert2";
 import router from "next/router";
 
-export interface FPPA04FormItem {
+export interface FPPA04CPMFormItem {
   category: string;
   description: string;
   total: string;
   exception: string;
 }
 
-export interface FPPA04Adjustment {
+export interface FPPA04CPMAdjustment {
   type: "บวก" | "หัก";
   description: string;
   amount: string;
 }
 
-export interface FPPA04FormValues {
+export interface FPPA04CPMFormValues {
   eventType: string;
   claimRefNumber: string;
   eventDescription: string;
@@ -32,8 +32,8 @@ export interface FPPA04FormValues {
   factory: string;
   policyNumber: string;
   surveyorRefNumber: string;
-  items: FPPA04FormItem[];
-  adjustments: FPPA04Adjustment[];
+  items: FPPA04CPMFormItem[];
+  adjustments: FPPA04CPMAdjustment[];
   signatureFiles: File[];
 }
 
@@ -44,7 +44,7 @@ interface Props {
     cause: string;
     approverName: string;
   };
-  initialData?: FPPA04FormValues;
+  initialData?: FPPA04CPMFormValues;
   onSave: () => void;
 }
 
@@ -56,7 +56,7 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
   const canReviewManager = isManager && defaults.status === "PENDING_MANAGER_REVIEW";
 
   // initialize state
-  const [vals, setVals] = useState<FPPA04FormValues>(() => ({
+  const [vals, setVals] = useState<FPPA04CPMFormValues>(() => ({
     eventType: initialData?.eventType || "",
     claimRefNumber: initialData?.claimRefNumber || "",
     eventDescription: initialData?.eventDescription || "",
@@ -106,7 +106,7 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
     setVals(v => ({ ...v, [name]: value }));
   };
 
-  const changeItem = (i: number, k: keyof FPPA04FormItem, v: string) => {
+  const changeItem = (i: number, k: keyof FPPA04CPMFormItem, v: string) => {
     if (!canEdit) return;
     setVals(vs => {
       const items = [...vs.items];
@@ -117,7 +117,7 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
   const addItem = () => canEdit && setVals(vs => ({ ...vs, items: [...vs.items, { category: "", description: "", total: "", exception: "" }] }));
   const delItem = (i: number) => canEdit && setVals(vs => ({ ...vs, items: vs.items.filter((_,idx) => idx!==i) }));
 
-  const changeAdj = (i: number, k: keyof FPPA04Adjustment, v: string) => {
+  const changeAdj = (i: number, k: keyof FPPA04CPMAdjustment, v: string) => {
     if (!canEdit) return;
     setVals(vs => {
       const a = [...vs.adjustments];

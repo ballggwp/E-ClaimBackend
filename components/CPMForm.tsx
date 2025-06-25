@@ -1,10 +1,8 @@
-// components/ClaimForm.tsx
 "use client";
 
 import React, { ChangeEvent } from "react";
 import Swal from "sweetalert2";
 
-//import { ClaimStatus, AttachmentType } from "@prisma/client";
 export interface User {
   id: string;
   name: string;
@@ -12,13 +10,12 @@ export interface User {
   role: "USER" | "MANAGER" | "INSURANCE";
 }
 
-export interface ClaimFormValues {
-  approverId: string;
+export interface CPMFormValues {
   accidentDate: string;
   accidentTime: string;
   location: string;
   cause: string;
-  
+  repairShop: string;
   policeDate: string;
   policeTime: string;
   policeStation: string;
@@ -35,116 +32,133 @@ export interface ClaimFormValues {
   partnerVictimDetail: string;
 }
 
-export type SubmitHandler = (
-  values: ClaimFormValues,
-  files: {
-    damageFiles: File[];
-    estimateFiles: File[];
-    otherFiles: File[];
-  },
-  saveAsDraft: boolean
-) => void;
+export type CPMSubmitHandler = (header: { categoryMain: string; categorySub: string; approverId: string },
+ values: CPMFormValues,
+ files: { damageFiles: File[]; estimateFiles: File[]; otherFiles: File[] },
+ saveAsDraft: boolean
+) => void
 
-interface ClaimFormProps {
-  values: ClaimFormValues;
-  onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+interface CPMFormProps {
+  header: { categoryMain: string; categorySub: string; approverId: string };
+  onHeaderChange: (e: ChangeEvent<HTMLSelectElement>) => void;
+  values: CPMFormValues;
+  onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   onFileChange: (
     e: ChangeEvent<HTMLInputElement>,
     field: "damageFiles" | "estimateFiles" | "otherFiles"
   ) => void;
-  onSubmit: SubmitHandler;
+  onSubmit: CPMSubmitHandler;
   approverList: User[];
   submitting: boolean;
   readOnly?: boolean;
+  isEvidenceFlow?: boolean;
   error: string | null;
   files: {
     damageFiles: File[];
     estimateFiles: File[];
     otherFiles: File[];
   };
-  isEvidenceFlow?: boolean;
 }
 
-export function ClaimForm({
+export default function CPMForm({
+  header,
+  onHeaderChange,
   values,
   onChange,
   onFileChange,
   onSubmit,
   approverList,
   submitting,
-  error,
-  files,
   readOnly = false,
   isEvidenceFlow = false,
-}: ClaimFormProps) {
-  // define which fields are required for full submit
-  const requiredTextFields: { key: keyof ClaimFormValues; label: string }[] = [
-    { key: "approverId",    label: "ผู้อนุมัติเอกสาร"         },
-    { key: "accidentDate",  label: "วันที่เกิดเหตุ"              },
-    { key: "accidentTime",  label: "เวลา"                        },
-    { key: "location",      label: "ที่อยู่สถานที่เกิดเหตุ"      },
-    { key: "cause",         label: "สาเหตุของอุบัติเหตุ"        },
-    { key: "damageDetail",  label: "รายละเอียดความเสียหาย"      },
-    { key: "damageAmount",  label: "มูลค่าโดยประมาณ"            },
+  error,
+  files,
+}: CPMFormProps) {
+  const requiredFields = [
+    { key: "approverId", label: "ผู้อนุมัติเอกสาร" },
+    { key: "accidentDate", label: "วันที่เกิดเหตุ" },
+    { key: "accidentTime", label: "เวลา" },
+    { key: "location", label: "สถานที่เกิดเหตุ" },
+    { key: "cause", label: "สาเหตุของอุบัติเหตุ" },
+    { key: "damageDetail", label: "รายละเอียดความเสียหาย" },
+    { key: "damageAmount", label: "มูลค่าความเสียหาย" },
   ];
 
   const handleClick = (saveAsDraft: boolean) => {
     if (!saveAsDraft) {
       const missing: string[] = [];
-      // validate text fields
-      requiredTextFields.forEach(({ key, label }) => {
-        if (!values[key] || values[key].trim() === "") missing.push(label);
+      requiredFields.forEach(({ key, label }) => {
+        const v = key === "approverId" ? header.approverId : (values as any)[key];
+        if (!v || v.trim() === "") missing.push(label);
       });
-      // validate two required file inputs
       if (!isEvidenceFlow) {
-      if (files.damageFiles.length === 0)   missing.push("รูปภาพความเสียหาย");
-      if (files.estimateFiles.length === 0) missing.push("เอกสารสำรวจความเสียหาย");
+        if (files.damageFiles.length === 0) missing.push("รูปภาพความเสียหาย");
+        if (files.estimateFiles.length === 0) missing.push("เอกสารสำรวจความเสียหาย");
       }
-      if (missing.length > 0) {
+      if (missing.length) {
         Swal.fire({
           icon: "warning",
           title: "กรุณาใส่ข้อมูลให้ครบถ้วน",
-          html: missing.map((m) => `&bull; ${m}`).join("<br/>"),
+          html: missing.map(m => `&bull; ${m}`).join("<br/>"),
         });
         return;
       }
     }
-
-    onSubmit(values, files, saveAsDraft);
+    onSubmit(header, values, files, saveAsDraft);
   };
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-3xl font-semibold text-gray-800 mb-8">
-        {readOnly
-          ? "เอกสารรอการดำเนินการ"
-          : values.accidentDate
-          ? "Edit Claim"
-          : "New Claim"}
+      <h1 className="text-3xl font-semibold mb-8">
+        {readOnly ? "View Claim" : "New Claim"}
       </h1>
 
-      {error && <p className="text-red-600 mb-4 bg-red-50 border border-red-200 px-4 py-2 rounded">{error}</p>}
+      {error && (
+        <p className="mb-4 p-3 bg-red-50 text-red-600 border border-red-200 rounded">
+          {error}
+        </p>
+      )}
 
       <form className="space-y-6">
-        {/* Approver */}
-        <div>
-          <label className="block mb-1 font-semibold text-gray-700">
-            เลือกผู้อนุมัติเอกสาร <span className="text-red-600">*</span>
-          </label>
-          <select
-            name="approverId"
-            value={values.approverId}
-            onChange={onChange}
-           className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
-            disabled={readOnly}
-          >
-            <option value="">-- โปรดเลือก --</option>
-            {approverList.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name} — {u.position}
-              </option>
-            ))}
-          </select>
+        {/* --- Header --- */}
+        <div className="grid grid-cols-3 gap-4 items-end">
+          <div>
+            <label className="block mb-1">หมวดหลัก</label>
+            <input
+              type="text"
+              readOnly
+              value={header.categoryMain||""}
+              className="w-full border px-3 py-2 rounded bg-gray-100"
+            />
+          </div>
+          <div>
+            <label className="block mb-1">หมวดย่อย</label>
+            <input
+              type="text"
+              readOnly
+              value={header.categorySub||""}
+              className="w-full border px-3 py-2 rounded bg-gray-100"
+            />
+          </div>
+          <div>
+            <label className="block mb-1">
+              ผู้อนุมัติเอกสาร <span className="text-red-600">*</span>
+            </label>
+            <select
+              name="approverId"
+              value={header.approverId||""}
+              onChange={onHeaderChange}
+              disabled={readOnly}
+              className="w-full border px-3 py-2 rounded"
+            >
+              <option value="">-- โปรดเลือก --</option>
+              {approverList.map(u => (
+                <option key={u.id} value={u.id}>
+                  {u.name} — {u.position}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* 1. Accident details */}
@@ -159,7 +173,7 @@ export function ClaimForm({
               <input
                 type="date"
                 name="accidentDate"
-                value={values.accidentDate}
+                value={values.accidentDate||""}
                 onChange={onChange}
                 className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
                 disabled={readOnly}
@@ -173,7 +187,7 @@ export function ClaimForm({
               <input
                 type="time"
                 name="accidentTime"
-                value={values.accidentTime}
+                value={values.accidentTime||""}
                 onChange={onChange}
                 className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
                 disabled={readOnly}
@@ -187,7 +201,7 @@ export function ClaimForm({
               <input
                 type="text"
                 name="location"
-                value={values.location}
+                value={values.location||""}
                 onChange={onChange}
                 className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
                 disabled={readOnly}
@@ -200,7 +214,7 @@ export function ClaimForm({
               </label>
               <textarea
                 name="cause"
-                value={values.cause}
+                value={values.cause||""}
                 onChange={onChange}
                 className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
                 disabled={readOnly}
@@ -220,7 +234,7 @@ export function ClaimForm({
               <input
                 type="date"
                 name="policeDate"
-                value={values.policeDate}
+                value={values.policeDate||""}
                 onChange={onChange}
                 disabled={readOnly}
                 className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
@@ -231,7 +245,7 @@ export function ClaimForm({
               <input
                 type="time"
                 name="policeTime"
-                value={values.policeTime}
+                value={values.policeTime||""}
                 onChange={onChange}
                 disabled={readOnly}
                 className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
@@ -242,7 +256,7 @@ export function ClaimForm({
               <input
                 type="text"
                 name="policeStation"
-                value={values.policeStation}
+                value={values.policeStation||""}
                 onChange={onChange}
                 disabled={readOnly}
                 className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
@@ -284,7 +298,7 @@ export function ClaimForm({
             <input
               type="text"
               name="damageOtherOwn"
-              value={values.damageOtherOwn}
+              value={values.damageOtherOwn||""}
               onChange={onChange}
               disabled={readOnly}
               placeholder="ระบุทรัพย์สิน"
@@ -296,7 +310,7 @@ export function ClaimForm({
               <label>รายละเอียดความเสียหาย</label>
               <textarea
                 name="damageDetail"
-                value={values.damageDetail}
+                value={values.damageDetail||""}
                 onChange={onChange}
                 disabled={readOnly}
                 className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
@@ -307,7 +321,7 @@ export function ClaimForm({
               <input
                 type="number"
                 name="damageAmount"
-                value={values.damageAmount}
+                value={values.damageAmount||""}
                 onChange={onChange}
                 disabled={readOnly}
                 className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
@@ -317,12 +331,23 @@ export function ClaimForm({
               <label>รายละเอียดผู้เสียชีวิต/ผู้บาดเจ็บ (หากมี)</label>
               <textarea
                 name="victimDetail"
-                value={values.victimDetail}
+                value={values.victimDetail||""}
                 onChange={onChange}
                 disabled={readOnly}
                 className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
               />
             </div>
+            <div className="col-span-2">
+  <label>ร้านที่ไปซ่อม</label>
+  <input
+    type="text"
+    name="repairShop"
+    value={values.repairShop||""}
+    onChange={onChange}
+    disabled={readOnly}
+    className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
+  />
+</div>
           </div>
         </fieldset>
 
@@ -337,7 +362,7 @@ export function ClaimForm({
               <input
                 type="text"
                 name="partnerName"
-                value={values.partnerName}
+                value={values.partnerName||""}
                 onChange={onChange}
                 disabled={readOnly}
                className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
@@ -348,7 +373,7 @@ export function ClaimForm({
               <input
                 type="text"
                 name="partnerPhone"
-                value={values.partnerPhone}
+                value={values.partnerPhone||""}
                 onChange={onChange}
                 disabled={readOnly}
                 className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
@@ -359,7 +384,7 @@ export function ClaimForm({
               <input
                 type="text"
                 name="partnerLocation"
-                value={values.partnerLocation}
+                value={values.partnerLocation||""}
                 onChange={onChange}
                 disabled={readOnly}
                 className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
@@ -369,7 +394,7 @@ export function ClaimForm({
               <label>รายละเอียดความเสียหายของทรัพย์สิน</label>
               <textarea
                 name="partnerDamageDetail"
-                value={values.partnerDamageDetail}
+                value={values.partnerDamageDetail||""}
                 onChange={onChange}
                 disabled={readOnly}
                 className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
@@ -380,7 +405,7 @@ export function ClaimForm({
               <input
                 type="number"
                 name="partnerDamageAmount"
-                value={values.partnerDamageAmount}
+                value={values.partnerDamageAmount||""}
                 onChange={onChange}
                 disabled={readOnly}
                 className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
@@ -390,7 +415,7 @@ export function ClaimForm({
               <label>รายละเอียดผู้เสียชีวิต/ผู้บาดเจ็บ (หากมี)</label>
               <textarea
                 name="partnerVictimDetail"
-                value={values.partnerVictimDetail}
+                value={values.partnerVictimDetail||""}
                 onChange={onChange}
                 disabled={readOnly}
                 className="w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm bg-white focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
@@ -496,4 +521,3 @@ export function ClaimForm({
     </div>
   );
 }
-

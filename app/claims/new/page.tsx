@@ -1,132 +1,107 @@
 // app/claims/new/page.tsx
 "use client";
 
-import { useState, useEffect, ChangeEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
-import { ClaimForm, ClaimFormValues, User } from "@/components/ClaimForm";
-
-const API = process.env.NEXT_PUBLIC_BACKEND_URL!;
 
 export default function NewClaimPage() {
   const router = useRouter();
-  const { data: session, status } = useSession();
 
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError]           = useState<string | null>(null);
-  const [approvers, setApprovers]   = useState<User[]>([]);
+  // Hard‐coded for now—swap out with an API fetch if you like
+  const MAIN_CATEGORIES = [
+    "Physical Assets",
+    "Personnel",
+    "Other",
+  ] as const;
+  const SUB_CATEGORIES: Record<typeof MAIN_CATEGORIES[number], string[]> = {
+    "Physical Assets": ["CPM", "Equipment", "Building"],
+    "Personnel":        ["Health", "Liability"],
+    "Other":            ["General", "Misc"],
+  };
 
-  const [values, setValues] = useState<ClaimFormValues>({
-    approverId: "",
-    accidentDate: "",
-    accidentTime: "",
-    location: "",
-    cause: "",
-    policeDate: "",
-    policeTime: "",
-    policeStation: "",
-    damageOwnType: "mitrphol",
-    damageOtherOwn: "",
-    damageDetail: "",
-    damageAmount: "",
-    victimDetail: "",
-    partnerName: "",
-    partnerPhone: "",
-    partnerLocation: "",
-    partnerDamageDetail: "",
-    partnerDamageAmount: "",
-    partnerVictimDetail: "",
-    
-  });
+  const [categoryMain, setCategoryMain] = useState<keyof typeof SUB_CATEGORIES | "">("");
+  const [subOptions,   setSubOptions]   = useState<string[]>([]);
+  const [categorySub,  setCategorySub]  = useState<string>("");
+  const [error,        setError]        = useState<string | null>(null);
 
-  const [files, setFiles] = useState({
-    damageFiles:    [] as File[],
-    estimateFiles:  [] as File[],
-    otherFiles:     [] as File[],
-  });
-
-  // Fetch list of approvers
+  // Whenever the main category changes, update the sub‐dropdown
   useEffect(() => {
-    if (status !== "authenticated") return;
-    fetch(`${API}/api/users`, {
-      headers: { Authorization: `Bearer ${session!.user.accessToken}` },
-    })
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((data: { users: User[] }) => setApprovers(data.users))
-      .catch((e) => console.error(e));
-  }, [status]);
+    if (categoryMain) {
+      setSubOptions(SUB_CATEGORIES[categoryMain]);
+      setCategorySub("");
+    } else {
+      setSubOptions([]);
+      setCategorySub("");
+    }
+  }, [categoryMain]);
 
-  const handleChange = (
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setValues((v) => ({ ...v, [name]: value }));
-  };
-
-  const handleFileChange = (
-    e: ChangeEvent<HTMLInputElement>,
-    field: keyof typeof files
-  ) => {
-    if (!e.target.files) return;
-    setFiles((f) => ({
-      ...f,
-      [field]: [...f[field], ...Array.from(e.target.files!)],
-    }));
-  };
-
-  const onSubmit = async (
-    vals: ClaimFormValues,
-    f: typeof files,
-    saveAsDraft: boolean
-  ) => {
-    setSubmitting(true);
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
     setError(null);
 
-    try {
-      const formData = new FormData();
-      formData.set("saveAsDraft", saveAsDraft.toString());
-      formData.set("approverId", vals.approverId);
-      Object.entries(vals).forEach(([k, v]) => {
-        if (k !== "approverId") formData.set(k, v as string);
-      });
-      f.damageFiles.forEach((file)   => formData.append("damageFiles", file));
-      f.estimateFiles.forEach((file) => formData.append("estimateFiles", file));
-      f.otherFiles.forEach((file)    => formData.append("otherFiles", file));
-
-      const res = await fetch(`${API}/api/claims`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${session!.user.accessToken}`,
-        },
-        body: formData,
-      });
-
-      if (res.status === 401) {
-        router.push("/login");
-        return;
-      }
-      if (!res.ok) throw new Error(await res.text());
-
-      router.push("/claims");
-    } catch (err: any) {
-      setError(err.message);
-      setSubmitting(false);
+    if (!categoryMain || !categorySub) {
+      setError("กรุณาเลือกทั้งประเภทหลักและประเภทย่อย");
+      return;
     }
+
+    // Navigate to the CPM form step, passing the selections in the query string
+    router.push(
+      `/${categorySub}/new?${new URLSearchParams({
+        categoryMain,
+        categorySub,
+      }).toString()}`
+    );
   };
 
   return (
-    <ClaimForm
-      values={values}
-      onChange={handleChange}
-      onFileChange={handleFileChange}
-      onSubmit={onSubmit}
-      approverList={approvers}
-      submitting={submitting}
-      error={error}
-      files={files}
-    />
+    <div className="max-w-md mx-auto mt-12 p-6 bg-white rounded-lg shadow">
+      <h1 className="text-2xl font-bold mb-6">สร้างเคลมใหม่</h1>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Main Category */}
+        <div>
+          <label className="block text-sm font-medium mb-1">ประเภทหลัก</label>
+          <select
+            value={categoryMain}
+            onChange={e => setCategoryMain(e.target.value as typeof categoryMain)}
+            required
+            className="w-full border px-3 py-2 rounded"
+          >
+            <option value="" disabled>-- เลือกประเภทหลัก --</option>
+            {MAIN_CATEGORIES.map(m => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Sub Category (dependent) */}
+        <div>
+          <label className="block text-sm font-medium mb-1">ประเภทย่อย</label>
+          <select
+            value={categorySub}
+            onChange={e => setCategorySub(e.target.value)}
+            required
+            disabled={!categoryMain}
+            className="w-full border px-3 py-2 rounded disabled:bg-gray-100"
+          >
+            <option value="" disabled>
+              {categoryMain ? "-- เลือกประเภทย่อย --" : "โปรดเลือกประเภทหลักก่อน"}
+            </option>
+            {subOptions.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+
+        {error && <p className="text-red-600 text-sm">{error}</p>}
+
+        <button
+          type="submit"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded transition"
+        >
+          ถัดไป: กรอกแบบฟอร์ม CPM
+        </button>
+      </form>
+    </div>
   );
 }
