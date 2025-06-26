@@ -27,6 +27,7 @@ export const listClaims: RequestHandler = async (req, res, next) => {
         createdAt:      true,
         submittedAt:    true,
         insurerComment: true,
+        categorySub: true,
         createdBy:      { select: { name: true } },
         cpmForm:        { select: { cause: true } },
       },
@@ -35,7 +36,8 @@ export const listClaims: RequestHandler = async (req, res, next) => {
     // Map it into a flat response
     const sanitized = claims.map(c => ({
       id:             c.id,
-      docNum:c.docNum,
+      docNum:         c.docNum,
+      categorySub:    c.categorySub,
       status:         c.status,
       createdAt:      c.createdAt.toISOString(),
       submittedAt:    c.submittedAt?.toISOString() ?? null,
@@ -125,6 +127,7 @@ export const getClaim: RequestHandler = async (req, res, next) => {
       include: {
         createdBy:  { select: { name: true } },
         approver:   { select: { name: true } },
+        docNum: true,
         attachments:true,
         cpmForm:    true, // your CPM form
         fppa04Base: {
@@ -269,6 +272,7 @@ export const claimAction: RequestHandler = async (req, res, next) => {
 
 // ─── Manager Actions ──────────────────────────────────────────────────────────
 export const ManagerAction: RequestHandler = async (req, res, next) => {
+  console.log("approve");
   try {
     const { id } = req.params;
     const { action, comment } = req.body as { action: 'approve'|'reject'; comment: string };
@@ -323,6 +327,7 @@ const dateStamp = format(now, "yyyyMMddHHmmss");
       location,
       cause,
       repairShop,
+      repairShopLocation,
       policeDate,
       policeTime,
       policeStation,
@@ -347,6 +352,7 @@ const dateStamp = format(now, "yyyyMMddHHmmss");
         location,
         cause,
         repairShop: repairShop || null,
+        repairShopLocation:repairShopLocation || null,
         policeDate:     policeDate ? new Date(policeDate) : undefined,
         policeTime:     policeTime || undefined,
         policeStation:  policeStation || undefined,
@@ -437,6 +443,7 @@ export const updateCpmForm: RequestHandler = async (req, res, next) => {
       location,
       cause,
       repairShop,
+      repairShopLocation,
       policeDate,
       policeTime,
       policeStation,
@@ -462,6 +469,7 @@ export const updateCpmForm: RequestHandler = async (req, res, next) => {
         location,
         cause,
         repairShop: repairShop || null,
+        repairShopLocation:repairShopLocation || null,
         policeDate:     policeDate ? new Date(policeDate) : null,
         policeTime:     policeTime || null,
         policeStation:  policeStation || null,

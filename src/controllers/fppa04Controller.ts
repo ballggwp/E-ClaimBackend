@@ -45,6 +45,8 @@ export const getFppa04Base: RequestHandler = async (req, res, next) => {
       include: {
         claim: {
           select: {
+            docNum:true,
+            cpmForm: { select: { cause: true } },
             id:           true,
             approverName: true,
             status:       true,
@@ -186,6 +188,10 @@ export const createFppa04Cpm: RequestHandler = async (req, res, next) => {
         items:       true,
         adjustments: true,
       },
+    });
+    await prisma.claim.update({
+      where: { id: req.params.id },
+      data: { status: 'PENDING_MANAGER_REVIEW' },
     });
 
     res.json({ cpm });
