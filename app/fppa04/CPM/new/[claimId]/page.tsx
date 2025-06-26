@@ -14,6 +14,7 @@ export default function NewFPPA04CPMPage() {
   const categoryMain        = 'Physical Assets'
   const categorySub         = 'CPM'
   const [defaults, setDefaults] = useState<{
+    docNum:string
     cause:        string
     approverName: string
     status:       string
@@ -61,6 +62,7 @@ export default function NewFPPA04CPMPage() {
 
         // 4) now seed your defaults
         setDefaults({
+          docNum:claim.docNum,
           cause:        claim.cpmForm?.cause ?? "",
           approverName: claim.approverName,
           status:       claim.status,

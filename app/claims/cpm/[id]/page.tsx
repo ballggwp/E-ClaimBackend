@@ -22,6 +22,7 @@ interface CpmData {
   location: string;
   cause: string;
   repairShop: string;
+  repairShopLocation: string,
   policeDate?: string;
   policeTime?: string;
   policeStation?: string;
@@ -61,6 +62,7 @@ export default function ClaimDetailPage() {
     location: "",
     cause: "",
     repairShop: "",
+    repairShopLocation: "",
     policeDate: "",
     policeTime: "",
     policeStation: "",
@@ -106,6 +108,7 @@ export default function ClaimDetailPage() {
           accidentDate: c.cpmForm.accidentDate?.slice(0, 10) ?? "",
           accidentTime: c.cpmForm.accidentTime ?? "",
           location: c.cpmForm.location ?? "",
+          repairShopLocation: c.cpmForm.repairShopLocation ?? "",
           cause: c.cpmForm.cause ?? "",
           repairShop:c.cpmForm.repairShop ??"",
           policeDate: c.cpmForm.policeDate?.slice(0, 10) ?? "",
@@ -210,7 +213,7 @@ export default function ClaimDetailPage() {
         showCancelButton: true,
       });
       if (!text) return;
-      comment = text;
+      comment = "Insurer-"+text;
     }
     setActionLoading(true);
     try {
@@ -248,9 +251,8 @@ const wrappedOnSubmit: CPMSubmitHandler = (_, vals, files, saveAsDraft) => {
   return handleSubmit(vals, files, saveAsDraft);
 };
 const noop = () => { /* no-op in read-only */ };
-  console.log("CPMForm values:", values);
   return (
-    <div className="max-w-3xl mx-auto py-10 space-y-8">
+    <div className="max-w-5xl mx-auto py-10 space-y-8">
       {claim.insurerComment && (
         <div className="p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded">
           <h4 className="font-semibold">Comment:</h4>

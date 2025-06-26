@@ -31,6 +31,7 @@ export default function NewCpmPage() {
         location:     "",
         cause:        "",
         repairShop: "",
+        repairShopLocation: "",
         policeDate:   "",
         policeTime:   "",
         policeStation:"",

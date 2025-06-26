@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 interface Claim {
+  docNumber: string
   id: string
   status: string
   createdAt: string | null

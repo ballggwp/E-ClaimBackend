@@ -2,7 +2,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import React, { ChangeEvent, FormEvent, useState } from "react";
+import React, { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Swal from "sweetalert2";
 import router from "next/router";
@@ -35,10 +35,12 @@ export interface FPPA04CPMFormValues {
   items: FPPA04CPMFormItem[];
   adjustments: FPPA04CPMAdjustment[];
   signatureFiles: File[];
+  signatureUrls?: string[]; 
 }
 
 interface Props {
   defaults: {
+    docNum:string
     accidentDate?: string;
     status: string;
     cause: string;
@@ -54,7 +56,9 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
   const { data: session } = useSession();
   const isManager = session?.user.role === "MANAGER";
   const canReviewManager = isManager && defaults.status === "PENDING_MANAGER_REVIEW";
-
+  const [newFiles, setNewFiles]     = useState<File[]>([])
+  const [newPreviews, setNewPreviews] = useState<string[]>([])
+  const existingUrls = initialData?.signatureUrls || []
   // initialize state
   const [vals, setVals] = useState<FPPA04CPMFormValues>(() => ({
     eventType: initialData?.eventType || "",
@@ -129,11 +133,26 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
   const delAdj = (i: number) => canEdit && setVals(vs => ({ ...vs, adjustments: vs.adjustments.filter((_,idx) => idx!==i) }));
 
   const onFile = (e: ChangeEvent<HTMLInputElement>) => {
-    if (!canEdit) return;
-    const files = e.target.files;
-    if (!files) return;
-    setVals(vs => ({ ...vs, signatureFiles: [...vs.signatureFiles, ...Array.from(files)] }));
-  };
+    if (!canEdit) return
+    const files = Array.from(e.target.files || [])
+    setNewFiles(f => [...f, ...files])
+    const urls = files.map(f => URL.createObjectURL(f))
+    setNewPreviews(p => [...p, ...urls])
+    // เก็บ files ไว้ใน vals ด้วย (ส่งขึ้น API)
+    setVals(v => ({ ...v, signatureFiles: [...v.signatureFiles, ...files] }))
+  }
+  useEffect(() => {
+    return () => newPreviews.forEach(url => URL.revokeObjectURL(url))
+  }, [newPreviews])
+   const removeNew = (i: number) => {
+    URL.revokeObjectURL(newPreviews[i])
+    setNewPreviews(p => p.filter((_, idx) => idx !== i))
+    setNewFiles(f => f.filter((_, idx) => idx !== i))
+    setVals(v => ({
+      ...v,
+      signatureFiles: v.signatureFiles.filter((_, idx) => idx !== i)
+    }))
+  }
 
   // calculate sums
   const totalSum = vals.items.reduce((s,i) => s + parseFloat(i.total||"0"), 0);
@@ -161,9 +180,9 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
       .forEach(k => fd.append(k, vals[k]));
     vals.items.forEach(i => fd.append("items", JSON.stringify(i)));
     vals.adjustments.forEach(a => fd.append("adjustments", JSON.stringify(a)));
-    vals.signatureFiles.forEach(f => {
-  fd.append("signatureFiles", f);   // ← each file under the same key
-});
+    vals.signatureFiles.forEach((file) => {
+      fd.append("signatureFiles", file);
+    });
     fd.append("netAmount", finalNet.toFixed(2));
 
     const res = await fetch(
@@ -173,6 +192,7 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
     if (!res.ok) return Swal.fire('Error', await res.text(), 'error');
     onSave();
   };
+
 
   const inputClass = (editable: boolean) =>
     `w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm focus:outline-none transition ${editable ? 'bg-white' : 'bg-gray-100 text-gray-600 cursor-not-allowed'}`;
@@ -184,7 +204,7 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label className="block mb-1 font-medium">เลขที่ฟอร์ม</label>
-          <input readOnly value={claimId} className="w-full border border-gray-300 px-4 py-2 rounded-lg bg-gray-50" />
+          <input readOnly value={defaults.docNum} className="w-full border border-gray-300 px-4 py-2 rounded-lg bg-gray-50" />
         </div>
         <div>
           <label className="block mb-1 font-medium">สาเหตุของอุบัติเหตุ</label>
@@ -510,48 +530,81 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
     disabled={!canEdit}
     className={inputClass(canEdit)}
   />
+  
+ {/* Preview gallery */}
+<div className="mt-3 grid grid-cols-4 gap-2">
 
-  {/* Preview gallery */}
-  <div className="mt-3 grid grid-cols-4 gap-2">
-    {vals.signatureFiles.map((file, idx) => {
-      const isImage = file.type.startsWith('image/');
-      const sizeKB = (file.size / 1024).toFixed(1);
-      return (
-        <div key={idx} className="relative p-2 border rounded bg-white">
-          {isImage ? (
-            <img
-              src={URL.createObjectURL(file)}
-              alt={file.name}
-              className="w-full h-24 object-contain mb-1"
-            />
-          ) : (
-            <div className="flex items-center justify-center h-24 text-4xl mb-1">
-              📄
-            </div>
-          )}
-          <div className="text-xs text-gray-700 truncate">
-            {file.name}
-          </div>
-          <div className="text-xs text-gray-500">
-            {sizeKB} KB
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setVals(v => {
-                const sigs = [...v.signatureFiles];
-                sigs.splice(idx, 1);
-                return { ...v, signatureFiles: sigs };
-              });
-            }}
-            className="absolute top-1 right-1 text-red-600 hover:text-red-800"
-          >
-            ✕
-          </button>
-        </div>
-      );
-    })}
-  </div>
+  {/* 1) รูปเดิมที่มี URL มาโชว์ */}
+  {existingUrls.map((url, idx) => {
+    const isImage = /\.(jpe?g|png|gif|bmp|webp)$/i.test(url);
+    const fileName = url.split('/').pop()?.split('?')[0] || `file-${idx+1}`;
+
+    return (
+      <div key={`old-${idx}`} className="p-2 border rounded bg-gray-50">
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block mb-1"
+        >
+          {isImage
+            ? <img src={url} alt={fileName} className="w-full h-24 object-contain" />
+            : <div className="flex items-center justify-center h-24 text-4xl">📄</div>
+          }
+        </a>
+        <div className="text-xs text-gray-700 truncate">{fileName}</div>
+      </div>
+    );
+  })}
+
+  {/* 2) รูปใหม่ที่เพิ่งอัปโหลด */}
+  {vals.signatureFiles.map((file, idx) => {
+  const isImage = file.type.startsWith('image/');
+  const sizeKB  = (file.size / 1024).toFixed(1);
+
+  // if name already contains a dot, use it; otherwise append the subtype from file.type
+  const hasDot    = file.name.includes('.');
+  const subtype   = file.type.split('/')[1] || '';
+  const displayName = hasDot
+    ? file.name
+    : `${file.name}.${subtype}`;
+
+  const blobUrl = URL.createObjectURL(file);
+
+  return (
+    <div key={`new-${idx}`} className="relative p-2 border rounded bg-white">
+      <a
+        href={blobUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        download={!isImage ? displayName : undefined}
+        className="block mb-1"
+      >
+        {isImage
+          ? <img src={blobUrl} alt={displayName} className="w-full h-24 object-contain" />
+          : <div className="flex items-center justify-center h-24 text-4xl">📄</div>
+        }
+      </a>
+      {/* here we show “name” plus “.subtype” if it was missing */}
+      <div className="text-xs text-gray-700 truncate">
+        {displayName}
+      </div>
+      <div className="text-xs text-gray-500">
+        {sizeKB} KB
+      </div>
+      <button
+        type="button"
+        onClick={() => removeNew(idx)}
+        className="absolute top-1 right-1 text-red-600 hover:text-red-800"
+      >
+        ✕
+      </button>
+    </div>
+  );
+})}
+  
+
+</div>
 </div>
       {/* Submit */}
       {canEdit && (
@@ -559,18 +612,6 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
           <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded">
             บันทึก FPPA04
           </button>
-        </div>
-      )}
-      {canReviewManager && (
-        <div className="flex justify-end space-x-2 mb-4">
-          <button
-            onClick={() => ManagerAction('reject')}
-            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
-          >ปฏิเสธ</button>
-          <button
-            onClick={() => ManagerAction('approve')}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
-          >อนุมัติ</button>
         </div>
       )}
     </form>

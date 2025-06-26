@@ -7,6 +7,7 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 
 interface ClaimSummary {
+  categorySub: string;
   id: string;
   docNum:string;
   cause?: string | null;    // now optional / nullable
@@ -227,14 +228,17 @@ function Section({
                     )}
                   </td>
                   <td className="px-6 py-3">
-                    {fppaLinkStatuses.includes(c.status) ? (
-                      <Link href={`/fppa04/${c.id}`} className="text-blue-600 hover:underline">
-                        ดูฟอร์ม
-                      </Link>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
-                  </td>
+  {fppaLinkStatuses.includes(c.status) ? (
+    <Link
+      href={`/fppa04/${c.categorySub}/${c.id}`}
+      className="text-blue-600 hover:underline"
+    >
+      ดูฟอร์ม
+    </Link>
+  ) : (
+    <span className="text-gray-400">—</span>
+  )}
+</td>
                 </tr>
               ))}
             </tbody>
