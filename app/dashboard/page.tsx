@@ -176,8 +176,7 @@ export default function DashboardPage() {
       return false;
     // insurers should not see pending-insurer-review
     if (
-      (role === "INSURANCE" && c.status === "PENDING_INSURER_REVIEW") ||
-      c.status === "PENDING_APPROVER_REVIEW"
+      (role === "INSURANCE" && (c.status === "PENDING_INSURER_REVIEW"||c.status === "PENDING_APPROVER_REVIEW"))
     )
       return false;
 
