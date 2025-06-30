@@ -157,6 +157,7 @@ export const createFppa04Cpm: RequestHandler = async (req, res, next) => {
       factory:           req.body.factory,
       policyNumber:      req.body.policyNumber,
       surveyorRefNumber: req.body.surveyorRefNumber,
+      insurancePayout:         parseFloat(req.body.insurancePayout),
       netAmount:         parseFloat(req.body.netAmount),
       signatureFiles, 
       items: {

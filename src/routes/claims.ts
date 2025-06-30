@@ -41,6 +41,7 @@ router.post(
   ensureRole("INSURANCE"),
   claimCtl.claimAction
 );
+router.post('/:id/approverAction', claimCtl.approverAction);
 
 // Manager actions
 router.post(
@@ -71,4 +72,5 @@ router.put(
   ]),
   claimCtl.updateCpmForm
 );
+
 export default router;

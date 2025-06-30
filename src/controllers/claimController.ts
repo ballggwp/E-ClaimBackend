@@ -4,39 +4,56 @@ import { Prisma, ClaimStatus } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { saveFile } from "../services/fileService";
 import { format } from "date-fns";
+import { fetchAzureToken, fetchUserInfoProfile } from "./authController";
 // ─── List Claims ───────────────────────────────────────────────────────────────
+// ─── List Claims ───────────────────────────────────
 export const listClaims: RequestHandler = async (req, res, next) => {
   try {
-    const { userEmail, excludeStatus } = req.query as {
-      userEmail?: string;
-      excludeStatus?: string;
-    };
+    // read our two filters (and an optional excludeStatus)
+    const { userEmail, approverId, excludeStatus } = req.query as {
+      userEmail?: string
+      approverId?: string
+      excludeStatus?: string
+    }
 
-    const where: any = {};
-    if (excludeStatus) where.status = { not: excludeStatus };
-    if (userEmail)     where.createdBy = { email: userEmail };
+    // build up the Prisma `where` clause
+    const where: any = {}
 
-    // Pull cause via the CPMForm relation—never from Claim.cause
-    const claims = await prisma.claim.findMany({
+    if (userEmail) {
+      // claims created by this email
+      where.createdBy = { email: userEmail }
+    }
+    if (approverId) {
+      // claims assigned to this approver
+      where.approverId = approverId
+    }
+    if (excludeStatus) {
+      where.status = { not: excludeStatus }
+    }
+
+    // fetch
+    const dbClaims = await prisma.claim.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
       select: {
-        id:             true,
-        docNum:true,
-        status:         true,
-        createdAt:      true,
-        submittedAt:    true,
-        insurerComment: true,
+        id: true,
+        docNum: true,
+        approverId: true,             // so the front end can match session.user.id
         categorySub: true,
-        createdBy:      { select: { name: true } },
-        cpmForm:        { select: { cause: true } },
+        status: true,
+        createdAt: true,
+        submittedAt: true,
+        insurerComment: true,
+        createdBy: { select: { name: true } },
+        cpmForm: { select: { cause: true } },
       },
-    });
+    })
 
-    // Map it into a flat response
-    const sanitized = claims.map(c => ({
+    // flatten for JSON
+    const claims = dbClaims.map(c => ({
       id:             c.id,
       docNum:         c.docNum,
+      approverId:     c.approverId,
       categorySub:    c.categorySub,
       status:         c.status,
       createdAt:      c.createdAt.toISOString(),
@@ -44,14 +61,16 @@ export const listClaims: RequestHandler = async (req, res, next) => {
       insurerComment: c.insurerComment,
       createdByName:  c.createdBy.name,
       cause:          c.cpmForm?.cause ?? null,
-    }));
+    }))
 
-    res.json({ claims: sanitized });
+    res.json({ claims })
   } catch (err) {
-    console.error("listClaims error:", err);
-    next(err);
+    console.error('listClaims error:', err)
+    next(err)
   }
-};
+}
+
+
 
 
 
@@ -59,55 +78,64 @@ export const listClaims: RequestHandler = async (req, res, next) => {
 export const createClaim: RequestHandler = async (req, res, next) => {
   try {
     const {
+
       categoryMain,
       categorySub,
       approverId,
+      approverEmail,
+      approverPosition,
+      approverName,
       saveAsDraft,
-    } = req.body as Record<string, string>;
-    const createdById   = req.user!.id;
-    const createdByName = req.user!.name!;
-    console.log("createby",createdByName)
+    } = req.body as {
 
-    // 1) Build date‐prefix yyyymmdd
+      categoryMain: string;
+      categorySub:  string;
+      approverId:   string;
+      approverName:string
+      approverEmail: string;
+      approverPosition:string,
+      saveAsDraft:  string;
+    };
+
+    const createdById = req.user!.id;
+const creator = await prisma.user.findUnique({ where: { id: createdById } });
+if (!creator) {
+  res.status(400).json({ message: `No such user: ${createdById}` });
+  return;
+}
+    
+    const createdByName = req.user!.name!;
+    console.log(createdById,createdByName)
     const today = new Date();
     const ymd   = format(today, "yyMMdd");
     const prefix = `${categorySub}${ymd}`;
 
-    // 2) Count existing docs with this prefix
+    // count existing
     const count = await prisma.claim.count({
       where: { docNum: { startsWith: prefix } }
     });
-
-    // 3) Pad the sequence (0001, 0002, …)
     const seq = String(count + 1).padStart(4, "0");
+    const docNum = `${prefix}${seq}`;
 
-    // 4) Final docNum
-    const docNum = `${prefix}${seq}`;    // e.g. "CPM202506240001"
+    // … generate docNum, count, etc …
 
-    // fetch approver name
-    const approver = await prisma.user.findUnique({
-      where:  { id: approverId },
-      select: { name: true },
-    });
-    if (!approver) {
-      res.status(400).json({ message: "Approver not found" });
-      return;
-    }
-
-    // 5) Create claim — Prisma will generate its own UUID for `id`
     const claim = await prisma.claim.create({
       data: {
-        docNum,                         // ← our new field
+        docNum,
         createdById,
         createdByName,
         approverId,
-        approverName:   approver.name,
-        status:         saveAsDraft === "true"
-                        ? ClaimStatus.DRAFT
-                        : ClaimStatus.PENDING_INSURER_REVIEW,
+        approverName: approverName,
+        approverPosition:approverPosition,
+        /** ← new required field: */
+        approverEmail,
+        status:
+          saveAsDraft === "true"
+            ? ClaimStatus.DRAFT
+            : ClaimStatus.PENDING_APPROVER_REVIEW,
         categoryMain,
         categorySub,
-        submittedAt:    saveAsDraft === "true" ? null : new Date(),
+        submittedAt: saveAsDraft === "true" ? null : new Date(),
       },
     });
 
@@ -117,6 +145,7 @@ export const createClaim: RequestHandler = async (req, res, next) => {
   }
 };
 
+
 // ─── Get Single Claim ─────────────────────────────────────────────────────────
 // src/controllers/claimController.ts
 export const getClaim: RequestHandler = async (req, res, next) => {
@@ -125,12 +154,10 @@ export const getClaim: RequestHandler = async (req, res, next) => {
     const claim = await prisma.claim.findUnique({
       where: { id },
       include: {
-        createdBy:  { select: { name: true } },
-        approver:   { select: { name: true } },
-        docNum: true,
-        attachments:true,
-        cpmForm:    true, // your CPM form
-        fppa04Base: {
+        createdBy: { select: { name: true, id: true } },
+        attachments: true,    // assuming this is a relation
+        cpmForm:    true,     // relation
+        fppa04Base: {          // relation
           include: {
             cpmVariant: {
               include: {
@@ -138,15 +165,14 @@ export const getClaim: RequestHandler = async (req, res, next) => {
                 adjustments: true,
               }
             }
-            // include other variants the same way
           }
         },
       },
     });
-    if (!claim) {
-      res.status(404).json({ message: "Not found" });
-      return;
-    }
+if (!claim) {
+  res.status(404).json({ message: "Not found" });
+  return;
+}
     const claimWithCause = {
       ...claim.cpmForm,
       cause: claim.cpmForm?.cause ?? "",
@@ -188,7 +214,7 @@ export const updateClaim: RequestHandler = async (req, res, next) => {
     if (approverId) {
       const approver = await prisma.user.findUnique({
         where:  { id: approverId },
-        select: { name: true },
+        select: { name: true ,position:true},
       });
       if (!approver) {
         res.status(400).json({ message: "Approver not found" });
@@ -197,6 +223,7 @@ export const updateClaim: RequestHandler = async (req, res, next) => {
       Object.assign(data, {
         approverId,
         approverName: approver.name,
+        approverPosition:approver.position,
       });
     }
 
@@ -520,14 +547,53 @@ export const updateCpmForm: RequestHandler = async (req, res, next) => {
     if (attachCreates.length) {
       await prisma.attachment.createMany({ data: attachCreates });
     }
-    await prisma.claim.update({
-      where: { id: claimId },
-      data: {
-        status: ClaimStatus.PENDING_INSURER_REVIEW
-      }
-    });
+    const saveAsDraft = req.body.saveAsDraft === 'true';
+    if (!saveAsDraft) {
+  await prisma.claim.update({
+    where: { id: claimId },
+    data: {
+      status: ClaimStatus.PENDING_INSURER_REVIEW,
+      submittedAt: new Date(),   // also stamp when it was actually submitted
+    },
+  });
+}
 
     res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+};
+export const approverAction: RequestHandler = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { action, comment } = req.body as { action: 'approve' | 'reject'; comment?: string };
+
+    // validate action
+    if (!['approve', 'reject'].includes(action)) {
+      res.status(400).json({ message: 'Invalid action' });
+      return;
+    }
+
+    // determine new status
+    const newStatus = action === 'approve'
+      ? ClaimStatus.PENDING_INSURER_REVIEW
+      : ClaimStatus.REJECTED;
+
+    // update claim
+    const updated = await prisma.claim.update({
+      where: { id },
+      data: {
+        status: newStatus,
+        ...(comment && { insurerComment: comment }),
+      },
+      select: {
+        id: true,
+        status: true,
+        insurerComment: true,
+      },
+    });
+
+    res.json({ claim: updated });
   } catch (err) {
     next(err);
   }

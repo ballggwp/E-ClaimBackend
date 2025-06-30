@@ -22,6 +22,7 @@ app.use(
   "/uploads",
   express.static(path.join(process.cwd(), "uploads"))
 );
+import userinfoRouter from './routes/userinfo'
 // 2) Mount your FPPA04 API (guarded inside that router by ensureRole)
 app.use('/api/fppa04', fppa04Routes)
 
@@ -35,6 +36,6 @@ app.use(
     createParentPath: true,
   })
 );
-
+app.use('/api/userinfo', authMiddleware, userinfoRouter)
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server on ${PORT}`));

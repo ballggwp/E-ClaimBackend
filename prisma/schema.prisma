@@ -9,6 +9,7 @@ generator client {
 
 enum ClaimStatus {
   DRAFT
+  PENDING_APPROVER_REVIEW
   PENDING_INSURER_REVIEW
   AWAITING_EVIDENCE
   PENDING_INSURER_FORM
@@ -32,41 +33,41 @@ enum Role {
 }
 
 model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  employeeNumber  String    @unique
-  name          String
-  role          Role     @default(USER)
-  position      String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             String   @id @default(uuid())
+  email          String   @unique
+  employeeNumber String   @unique
+  name           String
+  role           Role     @default(USER)
+  position       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  claimsCreated Claim[]  @relation("ClaimsCreated")
-  claimsToSign  Claim[]  @relation("ClaimsApprover")
+  claimsCreated Claim[] @relation("ClaimsCreated")
 }
 
 model Claim {
-  id           String   @id @default(uuid())
-  docNum       String   @unique
-  createdByName  String
-  approverName   String
-  createdById    String
-  createdBy      User         @relation("ClaimsCreated", fields: [createdById], references: [id])
-  approverId     String
-  approver       User         @relation("ClaimsApprover", fields: [approverId], references: [id])
+  id            String @id @default(uuid())
+  docNum        String @unique
+  createdByName String
+  approverName  String
+  approverPosition String
+  createdById   String
+  approverEmail  String
+  createdBy     User   @relation("ClaimsCreated", fields: [createdById], references: [id])
+  approverId    String
 
-  status         ClaimStatus  @default(DRAFT)
+  status         ClaimStatus @default(DRAFT)
   categoryMain   String?
   categorySub    String?
   submittedAt    DateTime?
   insurerComment String?
 
-  attachments    Attachment[] @relation("ClaimAttachments")
-  cpmForm        CPMForm?
-  fppa04Base     Fppa04Base?
+  attachments Attachment[] @relation("ClaimAttachments")
+  cpmForm     CPMForm?
+  fppa04Base  Fppa04Base?
 
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Attachment {
@@ -77,23 +78,23 @@ model Attachment {
   url        String
   uploadedAt DateTime       @default(now())
 
-  claim      Claim          @relation("ClaimAttachments", fields: [claimId], references: [id])
+  claim Claim @relation("ClaimAttachments", fields: [claimId], references: [id])
 }
 
 model CPMForm {
-  claimId        String   @id
-  claim          Claim    @relation(fields: [claimId], references: [id])
+  claimId String @id
+  claim   Claim  @relation(fields: [claimId], references: [id])
 
-  accidentDate   DateTime
-  accidentTime   String
-  location       String
-  cause          String
-  repairShop     String?
-  repairShopLocation String? 
+  accidentDate       DateTime
+  accidentTime       String
+  location           String
+  cause              String
+  repairShop         String?
+  repairShopLocation String?
 
-  policeDate     DateTime?
-  policeTime     String?
-  policeStation  String?
+  policeDate    DateTime?
+  policeTime    String?
+  policeStation String?
 
   damageOwnType  String
   damageOtherOwn String?
@@ -108,16 +109,16 @@ model CPMForm {
   partnerDamageAmount Float?
   partnerVictimDetail String?
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Fppa04Base {
-  id        String   @id @default(cuid())
-  claimId   String   @unique
-  mainType  String
-  subType   String
-  claim     Claim    @relation(fields: [claimId], references: [id])
+  id       String @id @default(cuid())
+  claimId  String @unique
+  mainType String
+  subType  String
+  claim    Claim  @relation(fields: [claimId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -126,8 +127,8 @@ model Fppa04Base {
 }
 
 model Fppa04CPM {
-  baseId            String       @id
-  base              Fppa04Base   @relation(fields: [baseId], references: [id])
+  baseId String     @id
+  base   Fppa04Base @relation(fields: [baseId], references: [id])
 
   eventType         String
   claimRefNumber    String
@@ -140,20 +141,21 @@ model Fppa04CPM {
   factory           String
   policyNumber      String
   surveyorRefNumber String
+  insurancePayout   Float
   netAmount         Float
   signatureFiles    String[]
 
-  items         Fppa04ItemCPM[]       @relation("Fppa04CPMItems")
-  adjustments   Fppa04AdjustmentCPM[] @relation("Fppa04CPMAdjustments")
+  items       Fppa04ItemCPM[]       @relation("Fppa04CPMItems")
+  adjustments Fppa04AdjustmentCPM[] @relation("Fppa04CPMAdjustments")
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Fppa04ItemCPM {
-  id          String     @id @default(cuid())
-  baseId      String
-  variant     Fppa04CPM  @relation("Fppa04CPMItems", fields: [baseId], references: [baseId])
+  id      String    @id @default(cuid())
+  baseId  String
+  variant Fppa04CPM @relation("Fppa04CPMItems", fields: [baseId], references: [baseId])
 
   category    String
   description String
@@ -162,9 +164,9 @@ model Fppa04ItemCPM {
 }
 
 model Fppa04AdjustmentCPM {
-  id          String     @id @default(cuid())
-  baseId      String
-  variant     Fppa04CPM  @relation("Fppa04CPMAdjustments", fields: [baseId], references: [baseId])
+  id      String    @id @default(cuid())
+  baseId  String
+  variant Fppa04CPM @relation("Fppa04CPMAdjustments", fields: [baseId], references: [baseId])
 
   type        String
   description String

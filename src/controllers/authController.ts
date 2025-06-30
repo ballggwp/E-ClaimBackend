@@ -4,7 +4,7 @@ import prisma from "../lib/prisma";
 import jwt from "jsonwebtoken";
 import axios from "axios";
 
-async function fetchAzureToken() {
+export async function fetchAzureToken() {
   const res = await axios.post(
     `https://login.microsoftonline.com/${process.env.AZURE_TENANT_ID}/oauth2/v2.0/token`,
     new URLSearchParams({
@@ -18,7 +18,7 @@ async function fetchAzureToken() {
   return res.data.access_token as string;
 }
 
-async function fetchUserInfoProfile(email: string, password: string, azureToken: string) {
+async function fetchUserInfoProfileWithPassword(email: string, password: string, azureToken: string) {
   // authenticate
   await axios.post(
     `https://${process.env.SERVICE_HOST}/userinfo/api/v2/authen`,
@@ -55,7 +55,7 @@ export const login: RequestHandler = async (req, res, next) => {
 
     // 1) Get an AAD token and verify credentials upstream
     const azureToken = await fetchAzureToken();
-    const profile    = await fetchUserInfoProfile(email, password, azureToken);
+    const profile    = await fetchUserInfoProfileWithPassword(email, password, azureToken);
 
     // 2) Find (or upsert) your local user by employeeNumber
     const empNo = String(profile.id);
@@ -105,9 +105,51 @@ export const login: RequestHandler = async (req, res, next) => {
       { expiresIn: "8h" }
     );
 
-    res.json({ user, token });
+    res.json({ user, token});
     // Do not return any value from the handler
   } catch (err: any) {
     next(err);
   }
 };
+export async function fetchUserInfoProfile(
+  email: string
+): Promise<{
+  id: string;
+  employeeName: { th: string; en: string };
+  department: { name: { en: string; th: string } };
+  position: { name: { en: string; th: string } };
+}> {
+  // get a fresh AAD token
+  const azureToken = await fetchAzureToken();
+
+  // first authenticate upstream
+  await axios.post(
+    `https://${process.env.SERVICE_HOST}/userinfo/api/v2/authen`,
+    { email, /* no password needed? */ },
+    {
+      headers: {
+        Authorization: `Bearer ${azureToken}`,
+        "Ocp-Apim-Subscription-Key": process.env.AZURE_SUBSCRIPTION_KEY!,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  // then fetch the profile
+  const profileRes = await axios.post(
+    `https://${process.env.SERVICE_HOST}/userinfo/api/v2/profile`,
+    { email },
+    {
+      headers: {
+        Authorization: `Bearer ${azureToken}`,
+        "Ocp-Apim-Subscription-Key": process.env.AZURE_SUBSCRIPTION_KEY!,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  const result = profileRes.data.result as any[];
+  if (!Array.isArray(result) || result.length === 0) {
+    throw new Error(`No profile found for ${email}`);
+  }
+  return result[0];
+}

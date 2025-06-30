@@ -1,12 +1,22 @@
 // src/routes/users.ts
 import { Router } from 'express'
-import { listUsers } from '../controllers/userController'
-import authMiddleware from '../middleware/authMiddleware'
+import { listUsers, listApprovers } from '../controllers/userController'
+import { ensureAuth } from '../middleware/authMiddleware'
 
 const router = Router()
 
+// List local users from Prisma
+router.get(
+  '/',
+  ensureAuth,
+  listUsers
+)
 
-// GET http://localhost:5000/api/users
-router.get('/', listUsers)
+// List approvers via your Azure‐backed profile API
+router.get(
+  '/approvers',
+  ensureAuth,
+  listApprovers
+)
 
 export default router
