@@ -1,28 +1,25 @@
 // app/claims/[id]/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, ChangeEvent } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import CPMForm, { CPMFormValues, CPMSubmitHandler, User } from "@/components/CPMForm";
 import Swal from "sweetalert2";
-import Link from "next/link";
 
 interface Attachment {
   id: string;
   fileName: string;
   url: string;
   type: "DAMAGE_IMAGE" | "ESTIMATE_DOC" | "OTHER_DOCUMENT";
-  createdAt?: string;
 }
-
 interface CpmData {
   accidentDate: string;
   accidentTime: string;
   location: string;
   cause: string;
   repairShop: string;
-  repairShopLocation: string,
+  repairShopLocation: string;
   policeDate?: string;
   policeTime?: string;
   policeStation?: string;
@@ -38,17 +35,24 @@ interface CpmData {
   partnerDamageAmount: string;
   partnerVictimDetail: string;
 }
-
 interface ClaimPayload {
+  approverName: string;
+  approverEmail: string;
   id: string;
-  docNum:string;
+  docNum: string;
   status: string;
+  categoryMain: string;
+  categorySub: string;
   approverId: string;
+  approverPosition:string;
+  createdByEmail: string;
   createdByName: string;
   insurerComment?: string;
   cpmForm?: CpmData;
   attachments: Attachment[];
 }
+
+const API = process.env.NEXT_PUBLIC_BACKEND_URL!;
 
 export default function ClaimDetailPage() {
   const { id } = useParams();
@@ -56,305 +60,292 @@ export default function ClaimDetailPage() {
   const { data: session, status } = useSession();
 
   const [claim, setClaim] = useState<ClaimPayload | null>(null);
-  const [values, setValues] = useState<CPMFormValues>({
-    accidentDate: "",
-    accidentTime: "",
-    location: "",
-    cause: "",
-    repairShop: "",
-    repairShopLocation: "",
-    policeDate: "",
-    policeTime: "",
-    policeStation: "",
-    damageOwnType: "mitrphol",
-    damageOtherOwn: "",
-    damageDetail: "",
-    damageAmount: "",
-    victimDetail: "",
-    partnerName: "",
-    partnerPhone: "",
-    partnerLocation: "",
-    partnerDamageDetail: "",
-    partnerDamageAmount: "",
-    partnerVictimDetail: "",
-  });
-  const [files, setFiles] = useState({
-    damageFiles: [] as File[],
-    estimateFiles: [] as File[],
-    otherFiles: [] as File[],
-  });
-  const [submitting, setSubmitting] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [loadingClaim, setLoadingClaim] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const isInsurer = session?.user.role === "INSURANCE";
-  const editableStatuses = ["DRAFT", "AWAITING_EVIDENCE"];
+  const [approvers, setApprovers] = useState<User[]>([]);
+  const [header, setHeader] = useState({
+    approverEmail: "",
+    categoryMain: "",
+    categorySub:  "",
+    approverId:   "",
+    approverPosition:"",
+    approverName: "",
+  });
 
-  // Fetch claim details
+  const [values, setValues] = useState<CPMFormValues>({
+    accidentDate:       "",
+    accidentTime:       "",
+    location:           "",
+    cause:              "",
+    repairShop:         "",
+    repairShopLocation: "",
+    policeDate:         "",
+    policeTime:         "",
+    policeStation:      "",
+    damageOwnType:      "mitrphol",
+    damageOtherOwn:     "",
+    damageDetail:       "",
+    damageAmount:       "",
+    victimDetail:       "",
+    partnerName:        "",
+    partnerPhone:       "",
+    partnerLocation:    "",
+    partnerDamageDetail:"",
+    partnerDamageAmount:"",
+    partnerVictimDetail:""
+  });
+
+  const [files, setFiles] = useState({
+    damageFiles:   [] as File[],
+    estimateFiles: [] as File[],
+    otherFiles:    [] as File[],
+  });
+  const [submitting,     setSubmitting]    = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+
   useEffect(() => {
     if (status !== "authenticated") return;
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/claims/${id}`, {
+    setLoadingClaim(true);
+    fetch(`${API}/api/claims/${id}`, {
       headers: { Authorization: `Bearer ${session!.user.accessToken}` },
     })
-      .then((res) => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`Failed to load claim (${res.status})`);
+        return res.json();
+      })
       .then((data: { claim: ClaimPayload }) => {
         const c = data.claim;
-        if (!c.cpmForm) {
-          setError("No CPM form data available");
-          return;
-        }
+        if (!c.cpmForm) throw new Error("CPM form is missing on this claim");
         setClaim(c);
+        setHeader({
+          categoryMain:  c.categoryMain,
+          categorySub:   c.categorySub,
+          approverId:    c.approverId,
+          approverEmail: c.approverEmail,
+          approverName:  c.approverName,
+          approverPosition:c.approverPosition,
+        });
         setValues({
-          accidentDate: c.cpmForm.accidentDate?.slice(0, 10) ?? "",
-          accidentTime: c.cpmForm.accidentTime ?? "",
-          location: c.cpmForm.location ?? "",
-          repairShopLocation: c.cpmForm.repairShopLocation ?? "",
-          cause: c.cpmForm.cause ?? "",
-          repairShop:c.cpmForm.repairShop ??"",
-          policeDate: c.cpmForm.policeDate?.slice(0, 10) ?? "",
-          policeTime: c.cpmForm.policeTime ?? "",
-          policeStation: c.cpmForm.policeStation ?? "",
-          damageOwnType: c.cpmForm.damageOwnType,
-          damageOtherOwn: c.cpmForm.damageOtherOwn ?? "",
-          damageDetail: c.cpmForm.damageDetail ?? "",
-          damageAmount: String(c.cpmForm.damageAmount ?? ""),
-          victimDetail: c.cpmForm.victimDetail ?? "",
-          partnerName: c.cpmForm.partnerName ?? "",
-          partnerPhone: c.cpmForm.partnerPhone ?? "",
-          partnerLocation: c.cpmForm.partnerLocation ?? "",
-          partnerDamageDetail: c.cpmForm.partnerDamageDetail ?? "",
-          partnerDamageAmount: String(c.cpmForm.partnerDamageAmount ?? ""),
-          partnerVictimDetail: c.cpmForm.partnerVictimDetail ?? "",
+          accidentDate:       c.cpmForm.accidentDate.slice(0,10),
+          accidentTime:       c.cpmForm.accidentTime,
+          location:           c.cpmForm.location,
+          cause:              c.cpmForm.cause,
+          repairShop:         c.cpmForm.repairShop,
+          repairShopLocation: c.cpmForm.repairShopLocation,
+          policeDate:         c.cpmForm.policeDate?.slice(0,10)   || "",
+          policeTime:         c.cpmForm.policeTime               || "",
+          policeStation:      c.cpmForm.policeStation            || "",
+          damageOwnType:      c.cpmForm.damageOwnType,
+          damageOtherOwn:     c.cpmForm.damageOtherOwn           || "",
+          damageDetail:       c.cpmForm.damageDetail             || "",
+          damageAmount:       String(c.cpmForm.damageAmount      || ""),
+          victimDetail:       c.cpmForm.victimDetail             || "",
+          partnerName:        c.cpmForm.partnerName              || "",
+          partnerPhone:       c.cpmForm.partnerPhone             || "",
+          partnerLocation:    c.cpmForm.partnerLocation          || "",
+          partnerDamageDetail:c.cpmForm.partnerDamageDetail      || "",
+          partnerDamageAmount:String(c.cpmForm.partnerDamageAmount|| ""),
+          partnerVictimDetail:c.cpmForm.partnerVictimDetail      || "",
         });
       })
-      .catch((err) => setError(err.message));
+      .catch(err => setError(err.message))
+      .finally(() => setLoadingClaim(false));
   }, [status, id, session]);
 
-  // Approvers list
-  const [approvers, setApprovers] = useState<User[]>([]);
   useEffect(() => {
     if (status !== "authenticated") return;
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users`, {
-      headers: { Authorization: `Bearer ${session!.user.accessToken}` },
-    })
-      .then((res) => res.json())
-      .then((data) => setApprovers(data.users))
-      .catch(console.error);
+    (async () => {
+      try {
+        const res = await fetch(`${API}/api/users`, {
+          headers: { Authorization: `Bearer ${session!.user.accessToken}` },
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const { users } = await res.json();
+        setApprovers(users);
+      } catch (err) {
+        console.error("Failed to load approvers:", err);
+      }
+    })();
   }, [status, session]);
 
-  if (error) return <p className="p-6 text-red-600">Error: {error}</p>;
-  if (!claim) return <p className="p-6">Loading…</p>;
+  if (status === "loading") return <p className="p-6">Loading session…</p>;
+  if (error)                    return <p className="p-6 text-red-600">{error}</p>;
+  if (loadingClaim)             return <p className="p-6">Loading claim…</p>;
+  if (!claim)                   return <p className="p-6">Claim not found</p>;
 
   const canEdit =
-    session!.user.role !== "INSURANCE" &&
-    editableStatuses.includes(claim.status);
+    session!.user.name === claim.createdByName &&
+    ["DRAFT","AWAITING_EVIDENCE"].includes(claim.status);
   const readOnly = !canEdit;
 
-  const handleFileChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    field: keyof typeof files
-  ) => {
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>, field: keyof typeof files) => {
     if (!e.target.files) return;
-    setFiles((prev) => ({
-      ...prev,
-      [field]: [...prev[field], ...Array.from(e.target.files!)],
-    }));
+    setFiles(f => ({ ...f, [field]: [...f[field], ...Array.from(e.target.files!)] }));
   };
-  const handleFileRemove = (
-    field: 'damageFiles' | 'estimateFiles' | 'otherFiles',
-    idx: number
-  ) => {
-    setFiles(prev => ({
-      ...prev,
-      [field]: prev[field].filter((_, i) => i !== idx)
-    }))
-  }
-
-  const handleSubmit = async (
-    vals: CPMFormValues,
-    f: typeof files,
-    saveAsDraft: boolean
-  ) => {
-    setSubmitting(true);
-    try {
-      const fd = new FormData();
-      fd.set("saveAsDraft", saveAsDraft.toString());
-      Object.entries(vals).forEach(
-        ([k, v]) => k !== "approverId" && fd.set(k, v as string)
-      );
-      f.damageFiles.forEach((file) => fd.append("damageFiles", file));
-      f.estimateFiles.forEach((file) => fd.append("estimateFiles", file));
-      f.otherFiles.forEach((file) => fd.append("otherFiles", file));
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/claims/${id}/cpm`,
-        {
-          method: "PUT",
-          headers: { Authorization: `Bearer ${session!.user.accessToken}` },
-          body: fd,
-        }
-      );
-      if (!res.ok) throw new Error(await res.text());
-      router.push("/claims");
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setSubmitting(false);
-    }
+  const handleFileRemove = (field: keyof typeof files, idx: number) => {
+    setFiles(f => ({ ...f, [field]: f[field].filter((_,i) => i!==idx) }));
   };
 
-  const handleAction = async (
-    action: "approve" | "reject" | "request_evidence"
-  ) => {
-    let comment: string | undefined;
-    if (action === "reject" || action === "request_evidence") {
+  const handleAction = async (action: "approve"|"reject"|"request_evidence") => {
+    let comment: string|undefined;
+    if (action !== "approve") {
       const { value: text } = await Swal.fire({
         input: "textarea",
-        title: action === "reject" ? "ระบุเหตุผล" : "ขอเอกสารเพิ่มเติม",
+        title: action==="reject" ? "ระบุเหตุผล" : "ขอเอกสารเพิ่มเติม",
         showCancelButton: true,
       });
       if (!text) return;
-      comment = "Insurer-"+text;
+      comment = text;
     }
     setActionLoading(true);
     try {
-      await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/claims/${id}/action`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session!.user.accessToken}`,
-          },
-          body: JSON.stringify({ action, comment }),
-        }
-      );
-      const detail = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/claims/${id}`,
-        { headers: { Authorization: `Bearer ${session!.user.accessToken}` } }
-      );
-      const { claim: fresh } = await detail.json();
-      setClaim(fresh);
+      const res = await fetch(`${API}/api/claims/${id}/action`, {
+        method: "POST",
+        headers: {
+          "Content-Type":"application/json",
+          Authorization: `Bearer ${session!.user.accessToken}`
+        },
+        body: JSON.stringify({ action, comment }),
+      });
+      if (!res.ok) throw new Error(await res.text());
       router.push("/dashboard");
     } catch (e: any) {
-      alert(e.message);
+      Swal.fire("Error", e.message, "error");
     } finally {
       setActionLoading(false);
     }
   };
-  const header = {
-  categoryMain: "Physical Assets" ,
-  categorySub:  "CPM",
-  approverId:   claim.approverId,
+  const handleApproverAction = async (action: "approve" | "reject") => {
+  let comment: string | undefined;
+  if (action === "reject") {
+    const { value: text } = await Swal.fire({
+      input: "textarea",
+      title: "ระบุเหตุผล",
+      showCancelButton: true,
+    });
+    if (!text) return;
+    comment = text;
+  }
+
+  setActionLoading(true);
+  try {
+    const res = await fetch(
+      `${API}/api/claims/${id}/approverAction`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session!.user.accessToken}`,
+        },
+        body: JSON.stringify({ action, comment }),
+      }
+    );
+    if (!res.ok) throw new Error(await res.text());
+    router.push("/dashboard");
+  } catch (e: any) {
+    Swal.fire("Error", e.message, "error");
+  } finally {
+    setActionLoading(false);
+  }
 };
-const wrappedOnSubmit: CPMSubmitHandler = (_, vals, files, saveAsDraft) => {
-  // ignore the header arg ("_") because in readOnly mode your header is fixed
-  return handleSubmit(vals, files, saveAsDraft);
-};
-const noop = () => { /* no-op in read-only */ };
+
+  const wrappedOnSubmit: CPMSubmitHandler = (_hdr, vals, f, saveAsDraft) => {
+    setSubmitting(true);
+    const fd = new FormData();
+    fd.set("saveAsDraft", saveAsDraft.toString());
+    Object.entries(vals).forEach(([k,v]) => fd.set(k, v as string));
+    f.damageFiles.forEach(f=>fd.append("damageFiles", f));
+    f.estimateFiles.forEach(f=>fd.append("estimateFiles", f));
+    f.otherFiles.forEach(f=>fd.append("otherFiles", f));
+
+    fetch(`${API}/api/claims/${id}/cpm`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${session!.user.accessToken}` },
+      body: fd,
+    })
+      .then(r => {
+        if (!r.ok) throw new Error(r.statusText);
+        router.push("/claims");
+      })
+      .catch(e => Swal.fire("Error", e.message, "error"))
+      .finally(() => setSubmitting(false));
+  };
+
+  const userEmpNum = String(session!.user.employeeNumber);
+
   return (
     <div className="max-w-5xl mx-auto py-10 space-y-8">
       {claim.insurerComment && (
         <div className="p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded">
-          <h4 className="font-semibold">Comment:</h4>
-          <p>{claim.insurerComment}</p>
+          <strong>Comment:</strong> {claim.insurerComment}
         </div>
       )}
-      <div className="text-gray-700">
-        <span className="font-semibold">ผู้กรอก:</span> {claim.createdByName}
-      </div>
-      <div className="p-6 space-y-4">
-        <h1 className="text-2xl font-bold">Claim {claim.docNum}</h1>
-        <p>
-          Status: <span className="font-semibold">{claim.status}</span>
-        </p>
-      </div>
+      <h1 className="text-2xl font-bold">Claim {claim.docNum}</h1>
+      <p>Status: <span className="font-semibold">{claim.status}</span></p>
+
       <CPMForm
-      header={header}
-  onHeaderChange={noop}
-  values={values}
-  files={files}
-  onChange={(e) => setValues(v => ({ ...v, [e.target.name]: e.target.value }))}
-  onFileChange={handleFileChange}
-  onFileRemove={handleFileRemove}
-  onSubmit={wrappedOnSubmit}
-  approverList={approvers}
-  submitting={submitting}
-  readOnly={readOnly}
-  isEvidenceFlow={claim.status === "AWAITING_EVIDENCE"}
-  error={null}
+        header={header}
+        onHeaderChange={e => setHeader(h => ({ ...h, [e.target.name]: e.target.value }))}
+        values={values}
+        onChange={e => setValues(v => ({ ...v, [e.target.name]: e.target.value }))}
+        onFileChange={handleFileChange}
+        onFileRemove={handleFileRemove}
+        onSubmit={wrappedOnSubmit}
+        approverList={approvers}
+        submitting={submitting}
+        readOnly={readOnly}
+        isEvidenceFlow={claim.status==="AWAITING_EVIDENCE"}
+        error={null}
+        files={files}
       />
-      <section className="pt-6 border-t space-y-10">
-        <h2 className="text-2xl font-bold">ไฟล์แนบ</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {["DAMAGE_IMAGE", "ESTIMATE_DOC", "OTHER_DOCUMENT"].map((type) => (
-            <div key={type}>
-              <h3 className="text-lg font-semibold mb-4">
-                {type === "DAMAGE_IMAGE"
-                  ? "รูปภาพ"
-                  : type === "ESTIMATE_DOC"
-                  ? "เอกสารสำรวจ"
-                  : "อื่น ๆ"}
-              </h3>
-              <div className="grid grid-cols-1 gap-4">
-                {claim.attachments
-  .filter(a => a.type === type)
-  .map(att => (
-    <a
-      key={att.id}
-      href={`${process.env.NEXT_PUBLIC_BACKEND_URL}${att.url}`}
-      target="_blank"
-      rel="noopener"
-      className="block rounded shadow hover:shadow-lg transition"
+
+      {userEmpNum === claim.approverId && claim.status === "PENDING_APPROVER_REVIEW" && (
+  <div className="flex space-x-4">
+    <button
+      onClick={() => handleApproverAction("approve")}
+      disabled={actionLoading}
+      className="bg-green-600 text-white px-4 py-2 rounded"
     >
-      <div className="h-40 bg-gray-100 flex items-center justify-center">
-        {/\.(jpe?g|png)$/i.test(att.fileName) ? (
-          <img
-            src={`${process.env.NEXT_PUBLIC_BACKEND_URL}${att.url}`}
-            alt={att.fileName}
-            className="object-cover h-full w-full"
-          />
-        ) : (
-          <span className="text-6xl text-gray-400">📄</span>
-        )}
-      </div>
-      <p className="mt-2 px-2 py-1 text-sm text-gray-700 truncate bg-white border-t">
-        {att.fileName}
-      </p>
-    </a>
-  ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-      {isInsurer && claim.status === "PENDING_INSURER_REVIEW" && (
+      Approve
+    </button>
+    <button
+      onClick={() => handleApproverAction("reject")}
+      disabled={actionLoading}
+      className="bg-red-600 text-white px-4 py-2 rounded"
+    >
+      Reject
+    </button>
+  </div>
+)}
+
+      {session!.user.role === "INSURANCE" && claim.status === "PENDING_INSURER_REVIEW" && (
         <div className="flex space-x-4">
           <button
             onClick={() => handleAction("approve")}
             disabled={actionLoading}
-            className="flex-1 bg-green-600 py-2 rounded text-white hover:bg-green-700"
+            className="bg-green-600 text-white px-4 py-2 rounded"
           >
             Approve
           </button>
           <button
             onClick={() => handleAction("reject")}
             disabled={actionLoading}
-            className="flex-1 bg-red-600 py-2 rounded text-white hover:bg-red-700"
+            className="bg-red-600 text-white px-4 py-2 rounded"
           >
             Reject
           </button>
           <button
             onClick={() => handleAction("request_evidence")}
             disabled={actionLoading}
-            className="flex-1 bg-yellow-500 py-2 rounded text-white hover:bg-yellow-600"
+            className="bg-yellow-500 text-white px-4 py-2 rounded"
           >
             Request Evidence
           </button>
         </div>
       )}
-      {readOnly && (
-        <p className="text-gray-600 italic pt-6 text-sm">View-only mode</p>
-      )}
+
+      {readOnly && <p className="text-gray-600 italic">View-only mode</p>}
     </div>
   );
 }

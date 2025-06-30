@@ -36,6 +36,7 @@ export interface FPPA04CPMFormValues {
   adjustments: FPPA04CPMAdjustment[];
   signatureFiles: File[];
   signatureUrls?: string[]; 
+  insurancePayout: string;
 }
 
 interface Props {
@@ -52,6 +53,20 @@ interface Props {
 
 export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
   const { claimId } = useParams();
+  const defaultAdjustments: FPPA04CPMAdjustment[] = [
+  { type: "หัก", description: "ส่วนลดจากตัวแทนจำหน่าย",                    amount: "0.00" },
+  { type: "หัก", description: "รายได้จากการขายเศษซาก",                    amount: "0.00" },
+  { type: "หัก", description: "กำหนดวงเงินเอาประกันภัยต่ำกว่ามูลค่าที่แท้จริง", amount: "0.00" },
+  { type: "บวก", description: "รายการที่เจรจาต่อได้เพิ่มขึ้น", amount: "0.00" },
+  { type: "หัก", description: "รายการที่ปรับลดลง", amount: "0.00" },
+  { type: "หัก", description: "ความรับผิดชอบส่วนแรก 10% หรือขั้นต่ำ 20,000 (พลิกคว่ำ)", amount: "0.00" },
+];
+const defaultItems: FPPA04CPMFormItem[] = [
+  { category: "1.1 รายการซ่อมแซม", description: "",total:"0.00",exception:"0.00" },
+  { category: "1.2 รายการเปลี่ยนใหม่", description: "",total:"0.00",exception:"0.00" },
+  { category: "1.3 รายการอื่นๆ (ไม่อยู่ในเงื่อนไขการเคลม)", description: "",total:"0.00",exception:"0.00" },
+  { category: "1.4 ค่าบริการ", description: "",total:"0.00",exception:"0.00" },
+];
   const canEdit = defaults.status === "PENDING_INSURER_FORM";
   const { data: session } = useSession();
   const isManager = session?.user.role === "MANAGER";
@@ -72,10 +87,14 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
     factory: initialData?.factory || "",
     policyNumber: initialData?.policyNumber || "",
     surveyorRefNumber: initialData?.surveyorRefNumber || "",
-    items: initialData?.items || [],
-    adjustments: initialData?.adjustments || [],
+    items: initialData?.items.length? initialData.items:defaultItems,
+    adjustments: initialData?.adjustments?.length
+    ? initialData.adjustments
+    : defaultAdjustments,
     signatureFiles: [],
+    insurancePayout: initialData?.insurancePayout || "",
   }));
+  
   const ManagerAction = async (action: "approve" | "reject") => {
     const { value: comment } = await Swal.fire({
       title: action === "approve" ? "อนุมัติแบบฟอร์ม?" : "ปฏิเสธแบบฟอร์ม?",
@@ -161,7 +180,7 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
   const plusSum = vals.adjustments.filter(a => a.type === "บวก").reduce((s,a) => s + parseFloat(a.amount||"0"), 0);
   const minusSum = vals.adjustments.filter(a => a.type === "หัก").reduce((s,a) => s + parseFloat(a.amount||"0"), 0);
   const finalNet = coverageSum + plusSum - minusSum;
-
+  
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!canEdit) return;
@@ -183,6 +202,7 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
     vals.signatureFiles.forEach((file) => {
       fd.append("signatureFiles", file);
     });
+    fd.append("insurancePayout", vals.insurancePayout);
     fd.append("netAmount", finalNet.toFixed(2));
 
     const res = await fetch(
@@ -355,7 +375,7 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
       </div>
 
       {/* ตารางรายการแจ้งเคลมประกัน */}
-<div className="overflow-auto max-h-64">
+<div className="overflow-auto">
   <table className=" table-fixed border-collapse ">
     <colgroup>
       <col className="w-1/5"/>
@@ -425,7 +445,7 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
 <hr className="my-6 border-t border-blue-200" />
 
 {/* ตารางรายการบวก/หัก */}
-<div className="overflow-auto max-h-48">
+<div className="overflow-auto">
   <table className="table-fixed border-collapse">
     <colgroup>
       <col className="w-1/6"/>
@@ -509,16 +529,35 @@ export default function FPPA04Form({ defaults, initialData, onSave }: Props) {
     </button>
   )}
 </div>
+<div className="flex items-end justify-between mb-6">
+  {/* left: insurance payout input */}
+  <div className="w-1/2 pr-4">
+    <label className="block mb-1 font-medium">
+      การพิจารณาจ่ายสินไหมจาก บ.ประกันภัย (บาท)
+    </label>
+    <input
+      name="insurancePayout"
+      type="number"
+      step="0.01"
+      value={vals.insurancePayout}
+      onChange={handleField}
+      disabled={!canEdit}
+      className={inputClass(canEdit)}
+      placeholder="กรอกจำนวนเงิน"
+    />
+  </div>
 
-      {/* สรุปยอดสุทธิ */}
-      <div className="flex justify-end items-baseline space-x-2">
-        <span className="font-semibold">เงินรับค่าสินไหมสุทธิ:</span>
-        <input readOnly value={finalNet.toFixed(2)} className="w-32 text-right bg-blue-50 border border-blue-200 rounded px-2 py-1.5 block mb-1 font-medium" />
-        <span>บาท</span>
-      </div>
-
-      <input type="hidden" name="netAmount" value={finalNet.toFixed(2)} />
-
+  {/* right: net summary */}
+  <div className="flex items-baseline space-x-2">
+    <span className="font-semibold">เงินรับค่าสินไหมสุทธิ:</span>
+    <input
+      readOnly
+      value={finalNet.toFixed(2)}
+      className="w-32 text-right bg-blue-50 border border-blue-200 rounded px-2 py-1.5 font-medium"
+    />
+    <span>บาท</span>
+  </div>
+</div>
       {/* Signature upload */}
 <div>
   <label className="block mb-1 font-medium">Signature Files</label>

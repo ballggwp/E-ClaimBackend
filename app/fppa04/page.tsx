@@ -7,6 +7,7 @@ import Link from "next/link"
 import { motion } from 'framer-motion'
 
 interface ClaimSummary {
+  docNum: string
   id: string
   cause: string
   createdAt: string
@@ -73,6 +74,7 @@ export default function Fppa04ListPage() {
             .filter((c: any) => c.status === 'PENDING_INSURER_FORM' && c.categorySub === subCat)
             .map((c: any) => ({
               id: c.id,
+              docNum:c.docNum,
               cause: c.cause,
               createdAt: c.createdAt,
               categorySub: c.categorySub,
@@ -153,7 +155,7 @@ export default function Fppa04ListPage() {
                   <tbody className="divide-y">
                     {claims.map(c => (
                       <motion.tr key={c.id} whileHover={{ backgroundColor: 'rgba(239,246,255,1)' }} className="transition">
-                        <td className="px-4 py-3 text-sm text-gray-800">{c.id}</td>
+                        <td className="px-4 py-3 text-sm text-gray-800">{c.docNum}</td>
                         <td className="px-4 py-3 text-sm text-gray-800">{c.cause}</td>
                         <td className="px-4 py-3 text-sm text-gray-800">{new Date(c.createdAt).toLocaleDateString('th-TH')}</td>
                         <td className="px-4 py-3">

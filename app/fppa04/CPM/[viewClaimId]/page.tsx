@@ -71,7 +71,8 @@ export default function ViewCPMPage() {
                                  amount:      a.amount.toString(),
                                })),
             signatureFiles: [],
-            signatureUrls: form.signatureFiles             // ไฟล์ใหม่ให้ว่าง
+            signatureUrls: form.signatureFiles ,
+            insurancePayout:  form.insurancePayout ,            // ไฟล์ใหม่ให้ว่าง
           })
         }
       } catch (e: any) {
@@ -90,7 +91,7 @@ export default function ViewCPMPage() {
         {/* HEADER */}
         <div className="bg-grey p-4 rounded-t-lg flex items-center justify-between">
           <h2 className="text-lg font-medium text-gray-800">
-            Claim ID: <span className="font-semibold">{viewClaimId}</span>
+            Claim ID: <span className="font-semibold">{defaults.docNum}</span>
           </h2>
           <Link href={`/claims/cpm/${viewClaimId}`} className="text-blue-600 hover:underline">
             → ดู claims

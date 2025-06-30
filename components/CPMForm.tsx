@@ -35,17 +35,26 @@ export interface CPMFormValues {
 }
 
 export type CPMSubmitHandler = (
-  header: { categoryMain: string; categorySub: string; approverId: string },
+  header: { categoryMain: string; categorySub: string; approverEmail: string; },
   values: CPMFormValues,
   files: { damageFiles: File[]; estimateFiles: File[]; otherFiles: File[] },
   saveAsDraft: boolean
 ) => void;
 
 interface CPMFormProps {
-  header: { categoryMain: string; categorySub: string; approverId: string };
-  onHeaderChange: (e: ChangeEvent<HTMLSelectElement>) => void;
+  header: {
+    categoryMain: string;
+    categorySub: string;
+    approverEmail: string;
+    approverId: string;
+    approverName: string;
+    approverPosition:string;
+  };
+  onHeaderChange: (e: ChangeEvent<HTMLInputElement>) => void;
   values: CPMFormValues;
-  onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  onChange: (
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => void;
   onFileChange: (
     e: ChangeEvent<HTMLInputElement>,
     field: "damageFiles" | "estimateFiles" | "otherFiles"
@@ -75,7 +84,6 @@ export default function CPMForm({
   onFileChange,
   onFileRemove,
   onSubmit,
-  approverList,
   submitting,
   readOnly = false,
   isEvidenceFlow = false,
@@ -83,7 +91,7 @@ export default function CPMForm({
   files,
 }: CPMFormProps) {
   const requiredFields = [
-    { key: "approverId", label: "ผู้อนุมัติเอกสาร" },
+    { key: "approverEmail", label: "ผู้อนุมัติเอกสาร" },
     { key: "accidentDate", label: "วันที่เกิดเหตุ" },
     { key: "accidentTime", label: "เวลา" },
     { key: "location", label: "สถานที่เกิดเหตุ" },
@@ -91,13 +99,14 @@ export default function CPMForm({
     { key: "damageDetail", label: "รายละเอียดความเสียหาย" },
     { key: "damageAmount", label: "มูลค่าความเสียหาย" },
   ];
+  
 
   const handleClick = (saveAsDraft: boolean) => {
     if (!saveAsDraft) {
       const missing: string[] = [];
       requiredFields.forEach(({ key, label }) => {
         const v =
-          key === "approverId" ? header.approverId : (values as any)[key];
+          key === "approverEmail" ? header.approverEmail : (values as any)[key];
         if (!v || v.trim() === "") missing.push(label);
       });
       if (!isEvidenceFlow) {
@@ -116,6 +125,7 @@ export default function CPMForm({
     }
     onSubmit(header, values, files, saveAsDraft);
   };
+  
   const inputClass = (readOnly: boolean) =>
   `w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm 
    focus:ring-2 focus:ring-blue-400 transition
@@ -144,45 +154,17 @@ export default function CPMForm({
           {/* Header */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">
-                หมวดหลัก
-              </label>
-              <input
-                type="text"
-                readOnly
-                value={header.categoryMain || ''}
-                className="w-full bg-gray-100 border border-gray-200 px-4 py-2 rounded-lg focus:outline-none"
-              />
+              <label className="block text-sm font-medium text-gray-600 mb-1">หมวดหลัก</label>
+              <input type="text" readOnly value={header.categoryMain} className="w-full bg-gray-100 border border-gray-200 px-4 py-2 rounded-lg focus:outline-none" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">
-                หมวดย่อย
-              </label>
-              <input
-                type="text"
-                readOnly
-                value={header.categorySub || ''}
-                className="w-full bg-gray-100 border border-gray-200 px-4 py-2 rounded-lg focus:outline-none"
-              />
+              <label className="block text-sm font-medium text-gray-600 mb-1">หมวดย่อย</label>
+              <input type="text" readOnly value={header.categorySub} className="w-full bg-gray-100 border border-gray-200 px-4 py-2 rounded-lg focus:outline-none" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">
-                ผู้อนุมัติเอกสาร <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="approverId"
-                value={header.approverId || ''}
-                onChange={onHeaderChange}
-                disabled={readOnly}
-                className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-400 transition"
-              >
-                <option value="">-- โปรดเลือก --</option>
-                {approverList.map(u => (
-                  <option key={u.id} value={u.id}>
-                    {u.name} — {u.position}
-                  </option>
-                ))}
-              </select>
+              <label className="block text-sm font-medium text-gray-600 mb-1">ผู้อนุมัติเอกสาร (EMAIL) <span className="text-red-500">*</span></label>
+              <input name="approverEmail" type="email" value={header.approverEmail} onChange={onHeaderChange} disabled={readOnly} className={inputClass(readOnly)} />
+              {header.approverName && (<p className="mt-1 text-sm text-gray-500">Approver: {header.approverName}</p>)}
             </div>
           </div>
 

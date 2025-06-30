@@ -93,6 +93,7 @@ export default function NewFPPA04CPMPage() {
                                   description: a.description,
                                   amount:      a.amount.toString(),
                                 })),
+            insurancePayout:  form.insurancePayout ,
             signatureFiles:   [],
           })
         }
