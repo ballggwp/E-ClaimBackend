@@ -4,7 +4,7 @@ import prisma from "../lib/prisma";
 import jwt from "jsonwebtoken";
 import axios from "axios";
 
-export async function fetchAzureToken() {
+export async function fetchAzureToken(): Promise<string> {
   const res = await axios.post(
     `https://login.microsoftonline.com/${process.env.AZURE_TENANT_ID}/oauth2/v2.0/token`,
     new URLSearchParams({
@@ -18,9 +18,13 @@ export async function fetchAzureToken() {
   return res.data.access_token as string;
 }
 
-async function fetchUserInfoProfileWithPassword(email: string, password: string, azureToken: string) {
-  // authenticate
-  await axios.post(
+async function fetchUserInfoProfileWithPassword(
+  email: string,
+  password: string,
+  azureToken: string
+) {
+  // 1) authenticate upstream
+  const authRes = await axios.post(
     `https://${process.env.SERVICE_HOST}/userinfo/api/v2/authen`,
     { email, password },
     {
@@ -32,7 +36,13 @@ async function fetchUserInfoProfileWithPassword(email: string, password: string,
     }
   );
 
-  // fetch profile
+  // 2) explicitly verify the API-level success code
+  const { code, message, result } = authRes.data;
+  if (code !== 200) {
+    throw new Error(message || result?.error || "Invalid credentials");
+  }
+
+  // 3) fetch the user profile
   const profileRes = await axios.post(
     `https://${process.env.SERVICE_HOST}/userinfo/api/v2/profile`,
     { email },
@@ -44,20 +54,22 @@ async function fetchUserInfoProfileWithPassword(email: string, password: string,
       },
     }
   );
-  const result = profileRes.data.result?.[0];
-  if (!result) throw new Error("No profile returned");
-  return result;
+  const profile = profileRes.data.result?.[0];
+  if (!profile) {
+    throw new Error("No profile returned");
+  }
+  return profile;
 }
 
 export const login: RequestHandler = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    // 1) Get an AAD token and verify credentials upstream
+    // 1) Get an Azure AD token and verify credentials upstream
     const azureToken = await fetchAzureToken();
     const profile    = await fetchUserInfoProfileWithPassword(email, password, azureToken);
 
-    // 2) Find (or upsert) your local user by employeeNumber
+    // 2) Upsert local user record
     const empNo = String(profile.id);
     const [deptEn, posEn, posTh] = [
       profile.department?.name.en,
@@ -66,11 +78,11 @@ export const login: RequestHandler = async (req, res, next) => {
     ];
     if (!deptEn || !posEn || !posTh) {
       res.status(500).json({ message: "Incomplete profile data" });
-      return;
+      return;  // ← return void, not return the response
     }
 
-    // determine role…
-    let role: "USER"|"MANAGER"|"INSURANCE" = "USER";
+    // determine role
+    let role: "USER" | "MANAGER" | "INSURANCE" = "USER";
     if (/Insurance Officer/i.test(posEn) && /Insurance/i.test(deptEn)) {
       role = "INSURANCE";
     } else if (/Manager/i.test(posEn) && /Insurance/i.test(deptEn)) {
@@ -78,7 +90,6 @@ export const login: RequestHandler = async (req, res, next) => {
     }
     const name = profile.employeeName?.th ?? profile.employeeName?.en ?? "Unknown";
 
-    // upsert local record
     const user = await prisma.user.upsert({
       where: { employeeNumber: empNo },
       create: {
@@ -90,27 +101,27 @@ export const login: RequestHandler = async (req, res, next) => {
       },
       update: {
         email,
-        //role,
         position: posTh,
+        // you could update role here if you wish
       },
     });
-     if (!user) {
-      res.status(400).json({ message: "User not found" });
-      return;
-    }
-    // 3) issue your own JWT
+
+    // 3) Issue your own JWT
     const token = jwt.sign(
-      { id: user.id, role: user.role, employeeNumber: empNo,name:user.name },
+      { id: user.id, role: user.role, employeeNumber: empNo, name: user.name },
       process.env.JWT_SECRET!,
       { expiresIn: "8h" }
     );
 
-    res.json({ user, token});
-    // Do not return any value from the handler
+    res.json({ user, token });
+
   } catch (err: any) {
+    // on invalid credentials (or any other error), bubble up to your error handler
     next(err);
   }
 };
+
+// (Optional) If you also rely on the no-password variant, update it similarly:
 export async function fetchUserInfoProfile(
   email: string
 ): Promise<{
@@ -119,23 +130,10 @@ export async function fetchUserInfoProfile(
   department: { name: { en: string; th: string } };
   position: { name: { en: string; th: string } };
 }> {
-  // get a fresh AAD token
   const azureToken = await fetchAzureToken();
 
-  // first authenticate upstream
-  await axios.post(
-    `https://${process.env.SERVICE_HOST}/userinfo/api/v2/authen`,
-    { email, /* no password needed? */ },
-    {
-      headers: {
-        Authorization: `Bearer ${azureToken}`,
-        "Ocp-Apim-Subscription-Key": process.env.AZURE_SUBSCRIPTION_KEY!,
-        "Content-Type": "application/json",
-      },
-    }
-  );
 
-  // then fetch the profile
+  // 3) fetch profile
   const profileRes = await axios.post(
     `https://${process.env.SERVICE_HOST}/userinfo/api/v2/profile`,
     { email },
@@ -147,9 +145,10 @@ export async function fetchUserInfoProfile(
       },
     }
   );
-  const result = profileRes.data.result as any[];
-  if (!Array.isArray(result) || result.length === 0) {
+
+  const profile = profileRes.data.result?.[0];
+  if (!profile) {
     throw new Error(`No profile found for ${email}`);
   }
-  return result[0];
+  return profile;
 }
