@@ -24,6 +24,7 @@ enum AttachmentType {
   DAMAGE_IMAGE
   ESTIMATE_DOC
   OTHER_DOCUMENT
+  USER_CONFIRM_DOC
 }
 
 enum Role {
@@ -55,7 +56,10 @@ model Claim {
   approverEmail  String
   createdBy     User   @relation("ClaimsCreated", fields: [createdById], references: [id])
   approverId    String
-
+  signerId            String?
+  signerEmail         String?
+  signerName          String?
+  signerPosition      String?
   status         ClaimStatus @default(DRAFT)
   categoryMain   String?
   categorySub    String?

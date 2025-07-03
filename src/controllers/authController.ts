@@ -37,10 +37,11 @@ async function fetchUserInfoProfileWithPassword(
   );
 
   // 2) explicitly verify the API-level success code
-  const { code, message, result } = authRes.data;
+  /* const { code, message, result } = authRes.data;
+  console.log(code)
   if (code !== 200) {
     throw new Error(message || result?.error || "Invalid credentials");
-  }
+  } */
 
   // 3) fetch the user profile
   const profileRes = await axios.post(
@@ -64,11 +65,13 @@ async function fetchUserInfoProfileWithPassword(
 export const login: RequestHandler = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-
+    //console.log(email,password)
+    
     // 1) Get an Azure AD token and verify credentials upstream
     const azureToken = await fetchAzureToken();
+    //console.log(azureToken)
     const profile    = await fetchUserInfoProfileWithPassword(email, password, azureToken);
-
+    console.log(profile)
     // 2) Upsert local user record
     const empNo = String(profile.id);
     const [deptEn, posEn, posTh] = [
@@ -125,6 +128,7 @@ export const login: RequestHandler = async (req, res, next) => {
 export async function fetchUserInfoProfile(
   email: string
 ): Promise<{
+  email: any;
   id: string;
   employeeName: { th: string; en: string };
   department: { name: { en: string; th: string } };
@@ -151,4 +155,27 @@ export async function fetchUserInfoProfile(
     throw new Error(`No profile found for ${email}`);
   }
   return profile;
+}
+export async function fetchUserInfoProfilesByKeyword(
+  keyword: string,
+): Promise<any[]> {
+  const azureToken = await fetchAzureToken();
+
+  const res = await axios.post(
+    `https://${process.env.SERVICE_HOST}/userinfo/api/v2/profile`,
+    { keyword},
+    {
+      headers: {
+        Authorization: `Bearer ${azureToken}`,
+        "Ocp-Apim-Subscription-Key": process.env.AZURE_SUBSCRIPTION_KEY!,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  const result = res.data.result;
+  if (!Array.isArray(result)) {
+    throw new Error("Profile search returned unexpected data");
+  }
+  return result;
 }

@@ -3,7 +3,7 @@ import express from "express";
 import multer from "multer";
 import * as claimCtl from "../controllers/claimController";
 import { ensureAuth, ensureRole } from "../middleware/authMiddleware";
-
+import { updateSigner } from "../controllers/claimController";
 const router = express.Router();
 const upload = multer({ dest: "uploads/" });
 // List & filter claims
@@ -51,6 +51,15 @@ router.post(
   claimCtl.ManagerAction
 );
 
+// instead of upload.single("confirmationFiles")…
+router.post(
+  "/:id/userconfirm",
+  ensureAuth,
+  upload.array("confirmationFiles", 10),   // <— allow up to 10 files here
+  claimCtl.userConfirm,
+);
+
+
 // Create CPM form
 router.post(
   "/:claimId/cpm",
@@ -59,6 +68,7 @@ router.post(
     { name: "damageFiles" },
     { name: "estimateFiles" },
     { name: "otherFiles" },
+    { name: 'userConfirmFiles' },
   ]),
   claimCtl.createCpmForm
 );
@@ -69,8 +79,21 @@ router.put(
     { name: "damageFiles" },
     { name: "estimateFiles" },
     { name: "otherFiles" },
+    { name: 'userConfirmFiles' },
   ]),
   claimCtl.updateCpmForm
 );
+router.put(
+  "/:id/signer",
+  // optionally insert a middleware here that checks req.user.role === "INSURANCE"
+  updateSigner
+);
+
+ router.get(
+   "/:id",
+   ensureAuth,
+   claimCtl.getClaim
+ );
+router.get("/:id/attachments", ensureAuth, claimCtl.listAttachments);
 
 export default router;

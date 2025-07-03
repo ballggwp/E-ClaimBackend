@@ -1,6 +1,6 @@
 // src/controllers/claimController.ts
 import type { RequestHandler } from "express";
-import { Prisma, ClaimStatus } from "@prisma/client";
+import { Prisma, ClaimStatus, AttachmentType } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { saveFile } from "../services/fileService";
 import { format } from "date-fns";
@@ -10,10 +10,14 @@ import { fetchAzureToken, fetchUserInfoProfile } from "./authController";
 export const listClaims: RequestHandler = async (req, res, next) => {
   try {
     // read our two filters (and an optional excludeStatus)
-    const { userEmail, approverId, excludeStatus } = req.query as {
+    const { userEmail, approverId, excludeStatus,categoryMain,
+      categorySub } = req.query as {
+       
       userEmail?: string
       approverId?: string
       excludeStatus?: string
+      categoryMain?:string
+      categorySub?:string
     }
 
     // build up the Prisma `where` clause
@@ -30,7 +34,8 @@ export const listClaims: RequestHandler = async (req, res, next) => {
     if (excludeStatus) {
       where.status = { not: excludeStatus }
     }
-
+    if (categoryMain)  where.categoryMain = categoryMain
+    if (categorySub)   where.categorySub  = categorySub
     // fetch
     const dbClaims = await prisma.claim.findMany({
       where,
@@ -46,6 +51,8 @@ export const listClaims: RequestHandler = async (req, res, next) => {
         insurerComment: true,
         createdBy: { select: { name: true } },
         cpmForm: { select: { cause: true } },
+        categoryMain:true,
+        updatedAt: true, 
       },
     })
 
@@ -61,6 +68,7 @@ export const listClaims: RequestHandler = async (req, res, next) => {
       insurerComment: c.insurerComment,
       createdByName:  c.createdBy.name,
       cause:          c.cpmForm?.cause ?? null,
+      updatedAt:     c.updatedAt.toISOString(),
     }))
 
     res.json({ claims })
@@ -86,6 +94,10 @@ export const createClaim: RequestHandler = async (req, res, next) => {
       approverPosition,
       approverName,
       saveAsDraft,
+      signerId,
+    signerEmail,
+    signerName,
+    signerPosition,
     } = req.body as {
 
       categoryMain: string;
@@ -95,6 +107,10 @@ export const createClaim: RequestHandler = async (req, res, next) => {
       approverEmail: string;
       approverPosition:string,
       saveAsDraft:  string;
+      signerId:  string,
+    signerEmail:  string,
+    signerName:  string,
+    signerPosition:  string,
     };
 
     const createdById = req.user!.id;
@@ -129,6 +145,10 @@ if (!creator) {
         approverPosition:approverPosition,
         /** ← new required field: */
         approverEmail,
+        signerId,
+    signerEmail,
+    signerName,
+    signerPosition,
         status:
           saveAsDraft === "true"
             ? ClaimStatus.DRAFT
@@ -596,5 +616,113 @@ export const approverAction: RequestHandler = async (req, res, next) => {
     res.json({ claim: updated });
   } catch (err) {
     next(err);
+  }
+};
+
+export const updateSigner: RequestHandler = async (req, res, next) => {
+  const { id } = req.params;
+  const {
+    signerId,
+    signerEmail,
+    signerName,
+    signerPosition,
+  } = req.body as {
+    signerId?: string;
+    signerEmail?: string;
+    signerName?: string;
+    signerPosition?: string;
+  };
+
+  // only INSURANCE users in PENDING_INSURER_REVIEW should hit this,
+  // you can also check req.user!.role or the claim.status here if you like
+
+  if (!signerId || !signerEmail || !signerName || !signerPosition) {
+    res
+      .status(422)
+      .json({ message: "Must provide signerId, signerEmail, signerName, signerPosition" });
+    return;
+  }
+
+  try {
+    const updated = await prisma.claim.update({
+      where: { id },
+      data: {
+        signerId,
+        signerEmail,
+        signerName,
+        signerPosition,
+      },
+    });
+    res.json({ claim: updated });
+  } catch (err) {
+    console.error("updateSigner error:", err);
+    next(err);
+  }
+};
+
+export const userConfirm: RequestHandler = async (req, res, next) => {
+  console.log("→ [userConfirm] invoked", { body: req.body, files: req.files });
+  try {
+    const { action, comment } = req.body as {
+      action: 'confirm'|'reject',
+      comment?: string
+    };
+
+    // now req.files is an array of Multer.File
+    const files = (req.files as Express.Multer.File[]) || [];
+    const creates = files.map(f => ({
+      id:       `${req.params.id}-${Date.now()}-U${Math.random().toString(36).slice(2,6)}`,
+      claimId:  req.params.id,
+      type:     AttachmentType.USER_CONFIRM_DOC,
+      fileName: f.originalname,
+      url:      saveFile(f),
+    }));
+
+    if (creates.length) {
+      await prisma.attachment.createMany({ data: creates });
+    }
+
+    await prisma.claim.update({
+      where: { id: req.params.id },
+      data: {
+        status: action === 'confirm'
+          ? ClaimStatus.COMPLETED    // now it really will go to COMPLETED
+          : ClaimStatus.PENDING_INSURER_REVIEW,
+        ...(action === 'reject' && comment
+          ? { insurerComment: `User–${comment}` }
+          : {}),
+      },
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('userConfirm error:', err);
+    next(err);
+  }
+};
+
+// ─── List Attachments by Claim ─────────────────────────────────────────────
+export const listAttachments: RequestHandler = async (req, res, next) => {
+  const claimId = req.params.id;
+  console.log(claimId)
+  try {
+    const attachments = await prisma.attachment.findMany({
+      where: { claimId },
+      orderBy: { id: "asc" },
+      select: {
+        id:        true,
+        fileName:  true,   // matches your Prisma schema
+        url:       true,   // matches your Prisma schema
+        uploadedAt: true,   // when it was uploaded
+        type:      true,
+        claimId :true,
+      },
+    });
+    // send back only this claim’s attachments
+    res.json(attachments);
+    console.log(attachments)
+  } catch (err: any) {
+    console.error("listAttachments error:", err);
+    res.status(500).json({ message: "ไม่สามารถโหลดไฟล์ได้" });
   }
 };

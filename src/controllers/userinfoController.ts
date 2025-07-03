@@ -1,21 +1,28 @@
 // src/controllers/userinfoController.ts
-import { RequestHandler } from 'express'
-import { fetchUserInfoProfile } from './authController'
+import { RequestHandler } from "express";
+import { fetchUserInfoProfilesByKeyword } from "./authController";
 
 export const getUserInfo: RequestHandler = async (req, res, next) => {
   try {
-    const email = req.query.email as string
-    if (!email) {
-      // send a 400 and then bail out—not returning the Response object
-      res.status(400).json({ message: 'Missing email' })
-      return
+    const keyword = String(req.query.keyword || "");
+    if (!keyword) {
+      res.status(400).json({ message: "Missing keyword" });
+      return;
     }
 
-    const profile = await fetchUserInfoProfile(email)
-    // send the profile, then exit
-    res.json(profile)
-    return
+    // upstream returns e.g. [{ id, name, email, positionName }]
+    const raw = await fetchUserInfoProfilesByKeyword(keyword);
+
+    // map to a flat shape for the client
+    const profiles = raw.map((p: any) => ({
+      id:           p.id,
+      email:        p.email,
+      name:         p.employeeName?.th || p.employeeName?.en || p.name,
+      position:     p.position?.name.th || p.position?.name.en || p.positionName,
+    }));
+
+    res.json(profiles);
   } catch (err) {
-    next(err)
+    next(err);
   }
-}
+};
