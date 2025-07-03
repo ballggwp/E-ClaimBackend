@@ -46,6 +46,14 @@ export default function NavBar() {
               ฟปภ04
             </Link>
           )}
+          {status === "authenticated" && (
+            <Link
+              href="/download"
+              className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-blue-100 hover:text-blue-700 transition"
+            >
+              download file
+            </Link>
+          )}
         </div>
 
         {/* User Section */}

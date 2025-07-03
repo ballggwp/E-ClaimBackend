@@ -1,8 +1,8 @@
 "use client";
-
+import { User } from "@/components/CPMForm";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import React, { ChangeEvent, useState } from "react";
+import React, { ChangeEvent, useEffect, useState } from "react";
 import CPMForm, { CPMFormValues } from "@/components/CPMForm";
 import { fetchJson } from "@/app/lib/fetchJson";
 
@@ -19,6 +19,12 @@ export default function NewCpmPage() {
     approverId:    "",
     approverName:  "",
     approverPosition:"",
+    approverKeyword:  "",  
+    signerKeyword:   "",
+  signerEmail:     "",
+  signerId:        "",
+  signerName:      "",
+  signerPosition:  "",
   });
   const [values, setValues] = useState<CPMFormValues>({
     accidentDate: "", accidentTime: "", location: "", cause: "",
@@ -34,37 +40,139 @@ export default function NewCpmPage() {
     estimateFiles: [] as File[],
     otherFiles:    [] as File[],
   });
+  const [signerSuggestions, setSignerSuggestions] = useState<User[]>([]);
+  const [suggestions, setSuggestions] = useState<User[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]         = useState<string|null>(null);
 
   // 👤 When user types an email, look up their profile
-  const handleHeaderChange = async (e: ChangeEvent<HTMLInputElement>) => {
-  const email = e.target.value.trim();
-  setHeader(h => ({ ...h, approverEmail: email }));
-  if (!email.includes("@mitrphol.com")) {
-    setHeader(h => ({ ...h, approverId: "", approverName: "",approverPosition:"" }));
-    return;
-  }
-  try {
-   const profile = await fetchJson(
-        `${API}/api/userinfo?email=${encodeURIComponent(email)}`,
-        {
-          headers: {
-            Authorization: `Bearer ${session!.user.accessToken}`
-         }
-        }
-      );
-
+    const handleHeaderChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const kw = e.target.value;
     setHeader(h => ({
       ...h,
-      approverId:   profile.id,
-      approverName: profile.employeeName.th || profile.employeeName.en,
-      approverPosition:profile.position.name.th
+      approverKeyword:  kw,
+      approverEmail:    "",
+      approverId:       "",
+      approverName:     "",
+      approverPosition: "",
     }));
-  } catch {
-    setHeader(h => ({ ...h, approverId: "", approverName: "",approverPosition:"" }));
+
+    // if they typed exactly one of the suggestions, finalize the pick immediately
+    const hit = suggestions.find(u =>
+    u.email === kw ||
+    u.employeeName.th === kw ||
+    u.employeeName.en === kw
+  );
+  if (hit) {
+    setHeader(h => ({
+      ...h,
+      // force the input to show the email instead of the name:
+      approverKeyword:  hit.email,
+      approverEmail:    hit.email,
+      approverId:       hit.id,
+      approverName:     hit.employeeName.th || hit.employeeName.en!,
+      approverPosition: hit.position,
+    }));
+    setSuggestions([]);  // close the dropdown
   }
 };
+
+  // 2) re-fetch on every keyword change (>=3 chars)
+  useEffect(() => {
+    const kw = header.approverKeyword.trim();
+    //if (kw.length < 3) {
+      //setSuggestions([]);
+      //return;
+    //}
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = await fetchJson(
+          `${API}/api/userinfo?keyword=${encodeURIComponent(kw)}`,
+          { headers: { Authorization: `Bearer ${session!.user.accessToken}` } }
+        );
+        // raw → Array<{ id, email, name, position }>
+        const users: User[] = (raw as any[]).map(p => ({
+          id:           p.id,
+          email:        p.email,
+          role:         "USER",
+          position:     p.position,
+          employeeName: { th: p.name, en: p.name },
+        }));
+        if (!cancelled) setSuggestions(users);
+      } catch {
+        if (!cancelled) setSuggestions([]);
+      }
+    })();
+    return () => { cancelled = true };
+  }, [header.approverKeyword, session]);
+
+
+
+
+const handleSignerChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const kw = e.target.value;
+  setHeader(h => ({
+    ...h,
+    signerKeyword:  kw,
+    signerEmail:    "",
+    signerId:       "",
+    signerName:     "",
+    signerPosition: "",
+  }));
+
+  // exact‐match pick:
+  const hit = signerSuggestions.find(u =>
+    u.email === kw ||
+    u.employeeName.th === kw ||
+    u.employeeName.en === kw
+  );
+  if (hit) {
+    setHeader(h => ({
+      ...h,
+      signerKeyword:  hit.email,
+      signerEmail:    hit.email,
+      signerId:       hit.id,
+      signerName:     hit.employeeName.th || hit.employeeName.en!,
+      signerPosition: hit.position,
+    }));
+    setSignerSuggestions([]);  // close dropdown
+  }
+};
+
+// 3) fetch on every signerKeyword change (>=3 chars)
+useEffect(() => {
+  const kw = header.signerKeyword;
+  //if (kw.length < 3) {
+   //setSignerSuggestions([]);
+   //return;
+ // }
+
+  let cancelled = false;
+  (async () => {
+    try {
+      const raw = await fetchJson(
+        `${API}/api/userinfo?keyword=${encodeURIComponent(kw)}`,
+        { headers: { Authorization: `Bearer ${session!.user.accessToken}` } }
+      );
+      const users: User[] = (raw as any[]).map(p => ({
+        id:           p.id,
+        email:        p.email,
+        role:         "USER",
+        position:     p.position,
+        employeeName: { th: p.name, en: p.name },
+      }));
+      if (!cancelled) setSignerSuggestions(users);
+    } catch {
+      if (!cancelled) setSignerSuggestions([]);
+    }
+  })();
+  return () => { cancelled = true };
+}, [header.signerKeyword, session]);
+
+
+console.log( header.signerName,header.signerEmail,header.signerId,header.signerPosition);
   console.log( header.approverName,header.approverEmail,header.approverId,header.approverPosition);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement|HTMLTextAreaElement>) => {
@@ -102,6 +210,12 @@ export default function NewCpmPage() {
           approverName:  header.approverName,
           approverPosition:    header.approverPosition,
           saveAsDraft:   saveAsDraft.toString(),
+          approverKeyword:  header.approverKeyword,
+          signerEmail:    header.signerEmail,
+  signerId:       header.signerId,
+  signerName:     header.signerName,
+  signerPosition: header.signerPosition,
+  signerKeyword:  header.signerKeyword,
         }),
       });
 
@@ -137,14 +251,22 @@ export default function NewCpmPage() {
         approverId:    header.approverId,
         approverName:  header.approverName,
         approverPosition:header.approverPosition,
+        approverKeyword: header.approverKeyword,
+        signerEmail:    header.signerEmail,
+  signerId:       header.signerId,
+  signerName:     header.signerName,
+  signerPosition: header.signerPosition,
+  signerKeyword:  header.signerKeyword,
       }}
       onHeaderChange={handleHeaderChange}
       values={values}
+      approverList={suggestions} 
       onChange={handleChange}
+      signerList={signerSuggestions}
+      onSignerChange={handleSignerChange}
       onFileChange={handleFileChange}
       onFileRemove={handleFileRemove}
-      onSubmit={onSubmit}
-      approverList={[]}    // no dropdown any more
+      onSubmit={onSubmit}    // no dropdown any more
       submitting={submitting}
       error={error}
       files={files}

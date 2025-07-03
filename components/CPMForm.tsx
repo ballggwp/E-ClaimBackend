@@ -1,13 +1,14 @@
 "use client";
 
-import React, { ChangeEvent } from "react";
+import React, { ChangeEvent, ChangeEventHandler } from "react";
 import Swal from "sweetalert2";
-import { motion } from 'framer-motion'
+import { motion } from "framer-motion";
 
 export interface User {
   id: string;
-  name: string;
+  employeeName: { th?: string; en?: string };
   position: string;
+  email: string;
   role: "USER" | "MANAGER" | "INSURANCE";
 }
 
@@ -35,7 +36,7 @@ export interface CPMFormValues {
 }
 
 export type CPMSubmitHandler = (
-  header: { categoryMain: string; categorySub: string; approverEmail: string; },
+  header: { categoryMain: string; categorySub: string; approverEmail: string },
   values: CPMFormValues,
   files: { damageFiles: File[]; estimateFiles: File[]; otherFiles: File[] },
   saveAsDraft: boolean
@@ -43,18 +44,28 @@ export type CPMSubmitHandler = (
 
 interface CPMFormProps {
   header: {
+    signerEditable?: boolean;
+    approverKeyword: string;
     categoryMain: string;
     categorySub: string;
     approverEmail: string;
     approverId: string;
     approverName: string;
-    approverPosition:string;
+    approverPosition: string;
+    signerEmail: string;
+    signerId: string;
+    signerName: string;
+    signerPosition: string;
+    signerKeyword: string;
   };
-  onHeaderChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  onHeaderChange: ChangeEventHandler<HTMLInputElement>;
+  onSignerChange: ChangeEventHandler<HTMLInputElement>;
   values: CPMFormValues;
-  onChange: (
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => void;
+  approverList: User[];
+  signerList: User[];
+  onSaveSigner?: () => void;
+  signerEditable?: boolean;
+  onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   onFileChange: (
     e: ChangeEvent<HTMLInputElement>,
     field: "damageFiles" | "estimateFiles" | "otherFiles"
@@ -64,7 +75,6 @@ interface CPMFormProps {
     index: number
   ) => void; // ← เพิ่มตรงนี้
   onSubmit: CPMSubmitHandler;
-  approverList: User[];
   submitting: boolean;
   readOnly?: boolean;
   isEvidenceFlow?: boolean;
@@ -78,12 +88,17 @@ interface CPMFormProps {
 
 export default function CPMForm({
   header,
+  onSaveSigner,
   onHeaderChange,
   values,
+  approverList,
   onChange,
+  signerList,
+  onSignerChange,
   onFileChange,
   onFileRemove,
   onSubmit,
+  signerEditable,
   submitting,
   readOnly = false,
   isEvidenceFlow = false,
@@ -99,7 +114,6 @@ export default function CPMForm({
     { key: "damageDetail", label: "รายละเอียดความเสียหาย" },
     { key: "damageAmount", label: "มูลค่าความเสียหาย" },
   ];
-  
 
   const handleClick = (saveAsDraft: boolean) => {
     if (!saveAsDraft) {
@@ -109,6 +123,7 @@ export default function CPMForm({
           key === "approverEmail" ? header.approverEmail : (values as any)[key];
         if (!v || v.trim() === "") missing.push(label);
       });
+      
       if (!isEvidenceFlow) {
         if (files.damageFiles.length === 0) missing.push("รูปภาพความเสียหาย");
         if (files.estimateFiles.length === 0)
@@ -125,12 +140,12 @@ export default function CPMForm({
     }
     onSubmit(header, values, files, saveAsDraft);
   };
-  
-  const inputClass = (readOnly: boolean) =>
-  `w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm 
-   focus:ring-2 focus:ring-blue-400 transition
-   ${readOnly ? 'bg-gray-100 text-gray-600' : 'bg-white text-gray-800'}`;
 
+  const inputClass = (readOnly: boolean) =>
+    `w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm 
+   focus:ring-2 focus:ring-blue-400 transition
+   ${readOnly ? "bg-gray-100 text-gray-600" : "bg-white text-gray-800"}`;
+  console.log(approverList);
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -140,7 +155,9 @@ export default function CPMForm({
     >
       <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl p-8">
         <h1 className="text-4xl font-bold text-gray-800 mb-6 text-center">
-          {readOnly ? 'ดูแบบฟอร์มแจ้งอุบัติเหตุ' : 'สร้างแบบฟอร์มแจ้งอุบัติเหตุ'}
+          {readOnly
+            ? "ดูแบบฟอร์มแจ้งอุบัติเหตุ"
+            : "สร้างแบบฟอร์มแจ้งอุบัติเหตุ"}
         </h1>
 
         {error && (
@@ -152,20 +169,109 @@ export default function CPMForm({
 
         <form className="space-y-8">
           {/* Header */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">หมวดหลัก</label>
-              <input type="text" readOnly value={header.categoryMain} className="w-full bg-gray-100 border border-gray-200 px-4 py-2 rounded-lg focus:outline-none" />
+              <label className="block text-sm font-medium text-gray-600 mb-1">
+                หมวดหลัก
+              </label>
+              <input
+                type="text"
+                readOnly
+                value={header.categoryMain}
+                className="w-full bg-gray-100 border border-gray-200 px-4 py-2 rounded-lg focus:outline-none"
+              />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">หมวดย่อย</label>
-              <input type="text" readOnly value={header.categorySub} className="w-full bg-gray-100 border border-gray-200 px-4 py-2 rounded-lg focus:outline-none" />
+              <label className="block text-sm font-medium text-gray-600 mb-1">
+                หมวดย่อย
+              </label>
+              <input
+                type="text"
+                readOnly
+                value={header.categorySub}
+                className="w-full bg-gray-100 border border-gray-200 px-4 py-2 rounded-lg focus:outline-none"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">
+                ผู้อนุมัติเอกสาร (EMAIL) <span className="text-red-500">*</span>
+              </label>
+              <input
+              disabled={readOnly}
+                name="approverKeyword"
+                type="text"
+                list="approverList"
+                value={header.approverKeyword}
+                onChange={onHeaderChange}
+                placeholder="พิมพ์ชื่อหรืออีเมล 3+ ตัว"
+                className={inputClass(readOnly)}
+              />
+
+              {/* only render the datalist if we have ≥1 suggestion */}
+              {approverList.length > 0 && !readOnly && (
+                <datalist id="approverList">
+                  {approverList.flatMap((u) => [
+                    // 1) match by name
+                    <option
+                      key={`${u.id}-n`}
+                      value={u.employeeName.th || u.employeeName.en}
+                    />,
+                    // 2) match by email
+                    <option key={`${u.id}-e`} value={u.email} />,
+                  ])}
+                </datalist>
+              )}
+
+              {/* show the picked approver */}
+              {header.approverName && (
+                <p className="mt-1 text-sm text-gray-500">
+                  approver {header.approverName} ({header.approverPosition})
+                </p>
+              )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">ผู้อนุมัติเอกสาร (EMAIL) <span className="text-red-500">*</span></label>
-              <input name="approverEmail" type="email" value={header.approverEmail} onChange={onHeaderChange} disabled={readOnly} className={inputClass(readOnly)} />
-              {header.approverName && (<p className="mt-1 text-sm text-gray-500">Approver: {header.approverName}</p>)}
-            </div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">
+    ผู้เซ็นอนุมัติเอกสาร (EMAIL){" "}
+    <span className="text-red-500">*</span>
+  </label>
+  <input
+    name="signerKeyword"
+    type="text"
+    list="signerList"
+    value={header.signerKeyword}
+    onChange={onSignerChange}
+    disabled={readOnly && !signerEditable}
+    placeholder="พิมพ์ชื่อหรืออีเมล 3+ ตัว"
+    className={inputClass(readOnly && !signerEditable)}
+  />
+
+  {/* only render the datalist if we have suggestions */}
+  {! (readOnly && !signerEditable) && signerList.length > 0 && (
+    <datalist id="signerList">
+      {signerList.flatMap((u) => [
+        <option key={`${u.id}-n`} value={u.employeeName.th ?? u.employeeName.en} />,
+        <option key={`${u.id}-e`} value={u.email} />,
+      ])}
+    </datalist>
+  )}
+
+  {/* once header.signerName is set, show it */}
+  {header.signerName && (
+    <p className="mt-1 text-sm text-gray-500">
+      Signer: {header.signerName} ({header.signerPosition})
+    </p>
+  )}
+  {signerEditable && onSaveSigner && (
+           <button
+             type="button"
+             onClick={onSaveSigner}
+             className="ml-2 mt-1 bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1 rounded"
+          >
+            Save signer           </button>
+        )}
+</div>
           </div>
 
           {/* 1. Accident Details */}
@@ -181,7 +287,7 @@ export default function CPMForm({
                 <input
                   type="date"
                   name="accidentDate"
-                  value={values.accidentDate || ''}
+                  value={values.accidentDate || ""}
                   onChange={onChange}
                   disabled={readOnly}
                   className={inputClass(readOnly)}
@@ -194,7 +300,7 @@ export default function CPMForm({
                 <input
                   type="time"
                   name="accidentTime"
-                  value={values.accidentTime || ''}
+                  value={values.accidentTime || ""}
                   onChange={onChange}
                   disabled={readOnly}
                   className={inputClass(readOnly)}
@@ -207,7 +313,7 @@ export default function CPMForm({
                 <input
                   type="text"
                   name="location"
-                  value={values.location || ''}
+                  value={values.location || ""}
                   onChange={onChange}
                   disabled={readOnly}
                   className={inputClass(readOnly)}
@@ -219,7 +325,7 @@ export default function CPMForm({
                 </label>
                 <textarea
                   name="cause"
-                  value={values.cause || ''}
+                  value={values.cause || ""}
                   onChange={onChange}
                   disabled={readOnly}
                   className={inputClass(readOnly)}
@@ -241,7 +347,7 @@ export default function CPMForm({
                 <input
                   type="date"
                   name="policeDate"
-                  value={values.policeDate || ''}
+                  value={values.policeDate || ""}
                   onChange={onChange}
                   disabled={readOnly}
                   className={inputClass(readOnly)}
@@ -252,18 +358,20 @@ export default function CPMForm({
                 <input
                   type="time"
                   name="policeTime"
-                  value={values.policeTime || ''}
+                  value={values.policeTime || ""}
                   onChange={onChange}
                   disabled={readOnly}
                   className={inputClass(readOnly)}
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm text-gray-600 mb-1">สถานีตำรวจ</label>
+                <label className="block text-sm text-gray-600 mb-1">
+                  สถานีตำรวจ
+                </label>
                 <input
                   type="text"
                   name="policeStation"
-                  value={values.policeStation || ''}
+                  value={values.policeStation || ""}
                   onChange={onChange}
                   disabled={readOnly}
                   className={inputClass(readOnly)}
@@ -284,7 +392,7 @@ export default function CPMForm({
                     type="radio"
                     name="damageOwnType"
                     value="mitrphol"
-                    checked={values.damageOwnType === 'mitrphol'}
+                    checked={values.damageOwnType === "mitrphol"}
                     onChange={onChange}
                     disabled={readOnly}
                     className="mr-2"
@@ -296,7 +404,7 @@ export default function CPMForm({
                     type="radio"
                     name="damageOwnType"
                     value="other"
-                    checked={values.damageOwnType === 'other'}
+                    checked={values.damageOwnType === "other"}
                     onChange={onChange}
                     disabled={readOnly}
                     className="mr-2"
@@ -306,7 +414,7 @@ export default function CPMForm({
                 <input
                   type="text"
                   name="damageOtherOwn"
-                  value={values.damageOtherOwn || ''}
+                  value={values.damageOtherOwn || ""}
                   onChange={onChange}
                   disabled={readOnly}
                   placeholder="ระบุทรัพย์สิน"
@@ -320,7 +428,7 @@ export default function CPMForm({
                   </label>
                   <textarea
                     name="damageDetail"
-                    value={values.damageDetail || ''}
+                    value={values.damageDetail || ""}
                     onChange={onChange}
                     disabled={readOnly}
                     className={inputClass(readOnly)}
@@ -333,7 +441,7 @@ export default function CPMForm({
                   <input
                     type="number"
                     name="damageAmount"
-                    value={values.damageAmount || ''}
+                    value={values.damageAmount || ""}
                     onChange={onChange}
                     disabled={readOnly}
                     className={inputClass(readOnly)}
@@ -345,29 +453,33 @@ export default function CPMForm({
                   </label>
                   <textarea
                     name="victimDetail"
-                    value={values.victimDetail || ''}
+                    value={values.victimDetail || ""}
                     onChange={onChange}
                     disabled={readOnly}
                     className={inputClass(readOnly)}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">ร้านที่ไปซ่อม</label>
+                  <label className="block text-sm text-gray-600 mb-1">
+                    ร้านที่ไปซ่อม
+                  </label>
                   <input
                     type="text"
                     name="repairShop"
-                    value={values.repairShop || ''}
+                    value={values.repairShop || ""}
                     onChange={onChange}
                     disabled={readOnly}
                     className={inputClass(readOnly)}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">ที่ตั้งร้านซ่อม</label>
+                  <label className="block text-sm text-gray-600 mb-1">
+                    ที่ตั้งร้านซ่อม
+                  </label>
                   <input
                     type="text"
                     name="repairShopLocation"
-                    value={values.repairShopLocation || ''}
+                    value={values.repairShopLocation || ""}
                     onChange={onChange}
                     disabled={readOnly}
                     className={inputClass(readOnly)}
@@ -390,7 +502,7 @@ export default function CPMForm({
                 <input
                   type="text"
                   name="partnerName"
-                  value={values.partnerName || ''}
+                  value={values.partnerName || ""}
                   onChange={onChange}
                   disabled={readOnly}
                   className={inputClass(readOnly)}
@@ -403,7 +515,7 @@ export default function CPMForm({
                 <input
                   type="text"
                   name="partnerPhone"
-                  value={values.partnerPhone || ''}
+                  value={values.partnerPhone || ""}
                   onChange={onChange}
                   disabled={readOnly}
                   className={inputClass(readOnly)}
@@ -416,7 +528,7 @@ export default function CPMForm({
                 <input
                   type="text"
                   name="partnerLocation"
-                  value={values.partnerLocation || ''}
+                  value={values.partnerLocation || ""}
                   onChange={onChange}
                   disabled={readOnly}
                   className={inputClass(readOnly)}
@@ -428,7 +540,7 @@ export default function CPMForm({
                 </label>
                 <textarea
                   name="partnerDamageDetail"
-                  value={values.partnerDamageDetail || ''}
+                  value={values.partnerDamageDetail || ""}
                   onChange={onChange}
                   disabled={readOnly}
                   className={inputClass(readOnly)}
@@ -441,7 +553,7 @@ export default function CPMForm({
                 <input
                   type="number"
                   name="partnerDamageAmount"
-                  value={values.partnerDamageAmount || ''}
+                  value={values.partnerDamageAmount || ""}
                   onChange={onChange}
                   disabled={readOnly}
                   className={inputClass(readOnly)}
@@ -453,7 +565,7 @@ export default function CPMForm({
                 </label>
                 <textarea
                   name="partnerVictimDetail"
-                  value={values.partnerVictimDetail || ''}
+                  value={values.partnerVictimDetail || ""}
                   onChange={onChange}
                   disabled={readOnly}
                   className={inputClass(readOnly)}
@@ -469,19 +581,19 @@ export default function CPMForm({
                 แนบเอกสารตามรายการ
               </h2>
 
-              {(['damageFiles', 'estimateFiles', 'otherFiles'] as const).map(
+              {(["damageFiles", "estimateFiles", "otherFiles"] as const).map(
                 (field, idx) => {
                   const label =
-                    field === 'damageFiles'
-                      ? '1) รูปภาพความเสียหาย'
-                      : field === 'estimateFiles'
-                      ? '2) เอกสารสำรวจความเสียหาย'
-                      : '3) เอกสารเพิ่มเติมอื่น ๆ'
+                    field === "damageFiles"
+                      ? "1) รูปภาพความเสียหาย"
+                      : field === "estimateFiles"
+                      ? "2) เอกสารสำรวจความเสียหาย"
+                      : "3) เอกสารเพิ่มเติมอื่น ๆ";
 
                   return (
                     <div key={field}>
                       <label className="block mb-2 font-medium text-gray-700">
-                        {label}{' '}
+                        {label}{" "}
                         {idx < 2 && <span className="text-red-500">*</span>}
                       </label>
 
@@ -505,7 +617,7 @@ export default function CPMForm({
                           type="file"
                           accept=".jpg,.jpeg,.png,.pdf"
                           multiple
-                          onChange={e => onFileChange(e, field)}
+                          onChange={(e) => onFileChange(e, field)}
                           className="hidden"
                         />
                       </label>
@@ -513,10 +625,10 @@ export default function CPMForm({
                       {files[field].length > 0 && (
                         <ul className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
                           {files[field].map((f, i) => {
-                            const isImage = f.type.startsWith('image/')
+                            const isImage = f.type.startsWith("image/");
                             const previewUrl = isImage
                               ? URL.createObjectURL(f)
-                              : null
+                              : null;
                             return (
                               <li
                                 key={`${field}-${i}`}
@@ -534,7 +646,9 @@ export default function CPMForm({
                                   </span>
                                 )}
                                 <div className="flex-1 truncate">
-                                  <p className="text-sm font-medium">{f.name}</p>
+                                  <p className="text-sm font-medium">
+                                    {f.name}
+                                  </p>
                                   <p className="text-xs text-gray-500">
                                     {(f.size / 1024).toFixed(1)} KB
                                   </p>
@@ -548,12 +662,12 @@ export default function CPMForm({
                                   ✕
                                 </button>
                               </li>
-                            )
+                            );
                           })}
                         </ul>
                       )}
                     </div>
-                  )
+                  );
                 }
               )}
             </section>
@@ -585,5 +699,5 @@ export default function CPMForm({
         </form>
       </div>
     </motion.div>
-  )
+  );
 }

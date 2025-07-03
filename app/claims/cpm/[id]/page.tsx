@@ -10,6 +10,7 @@ import CPMForm, {
   User,
 } from "@/components/CPMForm";
 import Swal from "sweetalert2";
+import { fetchJson } from "@/app/lib/fetchJson";
 
 interface Attachment {
   id: string;
@@ -40,6 +41,8 @@ interface CpmData {
   partnerVictimDetail: string;
 }
 interface ClaimPayload {
+  signerKeyword: string;
+  approverKeyword: string;
   approverName: string;
   approverEmail: string;
   id: string;
@@ -54,6 +57,10 @@ interface ClaimPayload {
   insurerComment?: string;
   cpmForm?: CpmData;
   attachments: Attachment[];
+  signerName: string;
+  signerEmail: string;
+  signerId: string;
+  signerPosition: string;
 }
 
 const API = process.env.NEXT_PUBLIC_BACKEND_URL!;
@@ -68,13 +75,20 @@ export default function ClaimDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [approvers, setApprovers] = useState<User[]>([]);
+  const [signers, setsigners] = useState<User[]>([]);
   const [header, setHeader] = useState({
+    approverKeyword: "",
+    signerKeyword: "",
     approverEmail: "",
     categoryMain: "",
     categorySub: "",
     approverId: "",
     approverPosition: "",
     approverName: "",
+    signerEmail:"",
+    signerId: "",
+    signerPosition: "",
+    signerName: "",
   });
 
   const [values, setValues] = useState<CPMFormValues>({
@@ -107,6 +121,7 @@ export default function ClaimDetailPage() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [signerSuggestions, setSignerSuggestions] = useState<User[]>([]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -129,7 +144,14 @@ export default function ClaimDetailPage() {
           approverEmail: c.approverEmail,
           approverName: c.approverName,
           approverPosition: c.approverPosition,
+          signerId: c.signerId,
+          signerEmail: c.signerEmail,
+          signerName: c.signerName,
+          signerPosition: c.signerPosition,
+          approverKeyword: c.approverEmail,
+    signerKeyword: c.signerEmail,
         });
+        
         setValues({
           accidentDate: c.cpmForm.accidentDate.slice(0, 10),
           accidentTime: c.cpmForm.accidentTime,
@@ -156,33 +178,135 @@ export default function ClaimDetailPage() {
       .catch((err) => setError(err.message))
       .finally(() => setLoadingClaim(false));
   }, [status, id, session]);
-
+  
   useEffect(() => {
-    if (status !== "authenticated") return;
-    (async () => {
-      try {
-        const res = await fetch(`${API}/api/users`, {
-          headers: { Authorization: `Bearer ${session!.user.accessToken}` },
-        });
-        if (!res.ok) throw new Error(await res.text());
-        const { users } = await res.json();
-        setApprovers(users);
-      } catch (err) {
-        console.error("Failed to load approvers:", err);
-      }
-    })();
-  }, [status, session]);
+  if (status !== "authenticated") return;
+  (async () => {
+    try {
+      const res = await fetch(`${API}/api/users`, {
+        headers: { Authorization: `Bearer ${session!.user.accessToken}` },
+      });
+      if (!res.ok) throw new Error(await res.text());
+      
+      const { users: raw } = await res.json();
+      const mapped: User[] = raw.map((u: any) => ({
+        id:           u.id,
+        email:        u.email,
+        role:         "USER",
+        position:     u.position,
+        employeeName: { th: u.name, en: u.name },
+      }));
 
+      setApprovers(mapped);
+    } catch (err) {
+      console.error("Failed to load approvers:", err);
+    }
+  })();
+}, [status, session]);
+  // inside ClaimDetailPage…
+
+const handleSignerChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const kw = e.target.value;
+  setHeader(h => ({
+    ...h,
+    signerKeyword:  kw,
+    signerEmail:    "",
+    signerId:       "",
+    signerName:     "",
+    signerPosition: "",
+  }));
+
+  // exact‐match pick:
+  const hit = signerSuggestions.find(u =>
+    u.email === kw ||
+    u.employeeName.th === kw ||
+    u.employeeName.en === kw
+  );
+  if (hit) {
+    setHeader(h => ({
+      ...h,
+      signerKeyword:  hit.email,
+      signerEmail:    hit.email,
+      signerId:       hit.id,
+      signerName:     hit.employeeName.th || hit.employeeName.en!,
+      signerPosition: hit.position,
+    }));
+    setSignerSuggestions([]);  // close dropdown
+  }
+};
+const handleSaveSigner = async () => {
+  try {
+    const res = await fetch(`${API}/api/claims/${id}/signer`, {
+  method: "PUT",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${session?.user.accessToken}`,
+  },
+  body: JSON.stringify({
+    signerId: header.signerId,
+    signerEmail: header.signerEmail,
+    signerName: header.signerName,
+    signerPosition: header.signerPosition,
+  }),
+});
+    if (!res.ok) throw new Error(await res.text());
+    Swal.fire("Saved!", "Signer was updated successfully.", "success");
+  } catch (e: any) {
+    Swal.fire("Error", e.message, "error");
+  }
+};
+useEffect(() => {
+  const kw = header.signerKeyword.trim();
+  if (kw.length < 3) {
+    setSignerSuggestions([]);
+    return;
+  }
+
+  let cancelled = false;
+  (async () => {
+    try {
+      const raw = await fetchJson(
+        `${API}/api/userinfo?keyword=${encodeURIComponent(kw)}`,
+        { headers: { Authorization: `Bearer ${session!.user.accessToken}` } }
+      );
+      const users: User[] = (raw as any[]).map(p => ({
+        id:           p.id,
+        email:        p.email,
+        role:         "USER",
+        position:     p.position,
+        employeeName: { th: p.name, en: p.name },
+      }));
+      if (!cancelled) setSignerSuggestions(users);
+    } catch {
+      if (!cancelled) setSignerSuggestions([]);
+    }
+  })();
+  return () => { cancelled = true };
+}, [header.signerKeyword, session]);
+
+
+
+  console.log(header.approverName,header.approverEmail,header.approverPosition,header.approverId)
+  console.log(header.signerName,header.signerEmail,header.signerPosition,header.signerId)
   if (status === "loading") return <p className="p-6">Loading session…</p>;
   if (error) return <p className="p-6 text-red-600">{error}</p>;
   if (loadingClaim) return <p className="p-6">Loading claim…</p>;
   if (!claim) return <p className="p-6">Claim not found</p>;
 
-  const canEdit =
-    session!.user.name === claim.createdByName &&
-    ["DRAFT", "AWAITING_EVIDENCE"].includes(claim.status);
-  const readOnly = !canEdit;
+  const isInsuranceReviewer =
+  session!.user.role === "INSURANCE" &&
+  claim.status === "PENDING_INSURER_REVIEW";
 
+const canEdit =
+   // original author on drafts/evidence
+   (session!.user.name === claim.createdByName &&
+     ["DRAFT", "AWAITING_EVIDENCE"].includes(claim.status))
+  // or insurance user when we're in the insurer‐review step
+
+
+const readOnly = !canEdit;
+const canEditSigner = isInsuranceReviewer;
+console.log(canEditSigner)
   const handleFileChange = (
     e: ChangeEvent<HTMLInputElement>,
     field: keyof typeof files
@@ -228,6 +352,7 @@ export default function ClaimDetailPage() {
       setActionLoading(false);
     }
   };
+  
   const handleApproverAction = async (action: "approve" | "reject") => {
     let comment: string | undefined;
     if (action === "reject") {
@@ -280,7 +405,7 @@ export default function ClaimDetailPage() {
       .catch((e) => Swal.fire("Error", e.message, "error"))
       .finally(() => setSubmitting(false));
   };
-
+  
   const userEmpNum = String(session!.user.employeeNumber);
 
   return (
@@ -296,14 +421,12 @@ export default function ClaimDetailPage() {
       </p>
 
       <CPMForm
+      onSaveSigner={canEditSigner ? handleSaveSigner : undefined}
         header={header}
-        onHeaderChange={(e) =>
-          setHeader((h) => ({ ...h, [e.target.name]: e.target.value }))
-        }
-        values={values}
-        onChange={(e) =>
-          setValues((v) => ({ ...v, [e.target.name]: e.target.value }))
-        }
+        onHeaderChange={(e) => setHeader((h) => ({ ...h, [e.target.name]: e.target.value }))}
+onSignerChange ={handleSignerChange }        
+values={values}
+        onChange={(e) => setValues((v) => ({ ...v, [e.target.name]: e.target.value }))}
         onFileChange={handleFileChange}
         onFileRemove={handleFileRemove}
         onSubmit={wrappedOnSubmit}
@@ -312,8 +435,9 @@ export default function ClaimDetailPage() {
         readOnly={readOnly}
         isEvidenceFlow={claim.status === "AWAITING_EVIDENCE"}
         error={null}
-        files={files}
-      />
+        signerEditable={canEditSigner}
+        files={files} 
+        signerList={signerSuggestions}     />
 
       {userEmpNum === claim.approverId &&
         claim.status === "PENDING_APPROVER_REVIEW" && (
