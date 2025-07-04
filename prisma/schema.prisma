@@ -38,6 +38,7 @@ model User {
   email          String   @unique
   employeeNumber String   @unique
   name           String
+  department     String?
   role           Role     @default(USER)
   position       String?
   createdAt      DateTime @default(now())

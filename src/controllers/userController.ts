@@ -13,7 +13,8 @@ export const listUsers: RequestHandler = async (_req, res, next) => {
         email: true,
         role: true,
         position: true,
-        employeeNumber: true
+        employeeNumber: true,
+        department: true, // include department
       },
     });
     res.json({ users });

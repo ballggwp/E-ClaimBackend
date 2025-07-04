@@ -74,12 +74,13 @@ export const login: RequestHandler = async (req, res, next) => {
     console.log(profile)
     // 2) Upsert local user record
     const empNo = String(profile.id);
-    const [deptEn, posEn, posTh] = [
+    const [deptTh,deptEn, posEn, posTh] = [
+      profile.department?.name.th,
       profile.department?.name.en,
       profile.position?.name.en,
       profile.position?.name.th,
     ];
-    if (!deptEn || !posEn || !posTh) {
+    if (!deptTh||!deptEn || !posEn || !posTh) {
       res.status(500).json({ message: "Incomplete profile data" });
       return;  // ← return void, not return the response
     }
@@ -100,11 +101,13 @@ export const login: RequestHandler = async (req, res, next) => {
         email,
         role,
         position: posTh,
+        department: deptTh,  // store department in English
         employeeNumber: empNo,
       },
       update: {
         email,
         position: posTh,
+        department: deptTh,
         // you could update role here if you wish
       },
     });
