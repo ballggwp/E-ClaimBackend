@@ -9,6 +9,7 @@ declare module "next-auth" {
       role:           string
       position:       string
       employeeNumber: string
+      department:string
     } & DefaultSession["user"]
   }
 
@@ -18,6 +19,7 @@ declare module "next-auth" {
     role:           string
     position:       string
     employeeNumber: string
+    department:string
   }
 }
 
@@ -28,5 +30,6 @@ declare module "next-auth/jwt" {
     role:           string
     position:       string
     employeeNumber: string
+    department:string
   }
 }
