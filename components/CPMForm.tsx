@@ -13,6 +13,7 @@ export interface User {
 }
 
 export interface CPMFormValues {
+  phoneNum: string;
   accidentDate: string;
   accidentTime: string;
   location: string;
@@ -107,6 +108,7 @@ export default function CPMForm({
 }: CPMFormProps) {
   const requiredFields = [
     { key: "approverEmail", label: "ผู้อนุมัติเอกสาร" },
+    { key: "phoneNum", label: "เบอร์โทรติดต่อ" },
     { key: "accidentDate", label: "วันที่เกิดเหตุ" },
     { key: "accidentTime", label: "เวลา" },
     { key: "location", label: "สถานที่เกิดเหตุ" },
@@ -123,7 +125,7 @@ export default function CPMForm({
           key === "approverEmail" ? header.approverEmail : (values as any)[key];
         if (!v || v.trim() === "") missing.push(label);
       });
-      
+
       if (!isEvidenceFlow) {
         if (files.damageFiles.length === 0) missing.push("รูปภาพความเสียหาย");
         if (files.estimateFiles.length === 0)
@@ -193,87 +195,95 @@ export default function CPMForm({
               />
             </div>
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+    {/* Approver */}
+    <div>
+      <label className="block text-sm font-medium text-gray-600 mb-1">
+        ผู้อนุมัติเอกสาร (EMAIL) <span className="text-red-500">*</span>
+      </label>
+      <input
+        disabled={readOnly}
+        name="approverKeyword"
+        type="text"
+        list="approverList"
+        value={header.approverKeyword}
+        onChange={onHeaderChange}
+        placeholder="พิมพ์ชื่อหรืออีเมล 3+ ตัว"
+        className={inputClass(readOnly)}
+      />
+      {approverList.length > 0 && !readOnly && (
+        <datalist id="approverList">
+          {approverList.flatMap((u) => [
+            <option key={`${u.id}-n`} value={u.employeeName.th || u.employeeName.en} />,
+            <option key={`${u.id}-e`} value={u.email} />,
+          ])}
+        </datalist>
+      )}
+      {header.approverName && (
+        <p className="mt-1 text-sm text-gray-500">
+          approver {header.approverName} ({header.approverPosition})
+        </p>
+      )}
+    </div>
+
+    {/* Signer (เอาทุกอย่างไว้ใน div เดียว) */}
+    <div className="flex flex-col">
+      <label className="block text-sm font-medium text-gray-600 mb-1">
+        ผู้เซ็นอนุมัติเอกสาร (EMAIL) <span className="text-red-500">*</span>
+      </label>
+      <input
+        name="signerKeyword"
+        type="text"
+        list="signerList"
+        value={header.signerKeyword}
+        onChange={onSignerChange}
+        disabled={readOnly && !signerEditable}
+        placeholder="พิมพ์ชื่อหรืออีเมล 3+ ตัว"
+        className={inputClass(readOnly && !signerEditable)}
+      />
+
+      {/* datalist ให้อยู่ข้างใน */}
+      {!(readOnly && !signerEditable) && signerList.length > 0 && (
+        <datalist id="signerList">
+          {signerList.flatMap((u) => [
+            <option key={`${u.id}-n`} value={u.employeeName.th ?? u.employeeName.en} />,
+            <option key={`${u.id}-e`} value={u.email} />,
+          ])}
+        </datalist>
+      )}
+
+      {/* ชื่อ signer */}
+      {header.signerName && (
+        <p className="mt-1 text-sm text-gray-500">
+          Signer: {header.signerName} ({header.signerPosition})
+        </p>
+      )}
+      {/* ปุ่ม Save */}
+      {signerEditable && onSaveSigner && (
+        <button
+          type="button"
+          onClick={onSaveSigner}
+          className="ml-2 mt-1 bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1 rounded"
+        >
+          Save signer
+        </button>
+      )}
+    </div>
+  </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">
-                ผู้อนุมัติเอกสาร (EMAIL) <span className="text-red-500">*</span>
-              </label>
-              <input
-              disabled={readOnly}
-                name="approverKeyword"
-                type="text"
-                list="approverList"
-                value={header.approverKeyword}
-                onChange={onHeaderChange}
-                placeholder="พิมพ์ชื่อหรืออีเมล 3+ ตัว"
-                className={inputClass(readOnly)}
-              />
-
-              {/* only render the datalist if we have ≥1 suggestion */}
-              {approverList.length > 0 && !readOnly && (
-                <datalist id="approverList">
-                  {approverList.flatMap((u) => [
-                    // 1) match by name
-                    <option
-                      key={`${u.id}-n`}
-                      value={u.employeeName.th || u.employeeName.en}
-                    />,
-                    // 2) match by email
-                    <option key={`${u.id}-e`} value={u.email} />,
-                  ])}
-                </datalist>
-              )}
-
-              {/* show the picked approver */}
-              {header.approverName && (
-                <p className="mt-1 text-sm text-gray-500">
-                  approver {header.approverName} ({header.approverPosition})
-                </p>
-              )}
+              <label className="block text-sm text-gray-600 mb-1">
+                  หมายเลขติดต่อ <span className="text-red-500">*</span>
+                </label>
+                <input
+                  name="phoneNum"
+                  value={values.phoneNum || ""}
+                  onChange={onChange}
+                  disabled={readOnly}
+                  className={inputClass(readOnly)}
+                />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">
-    ผู้เซ็นอนุมัติเอกสาร (EMAIL){" "}
-    <span className="text-red-500">*</span>
-  </label>
-  <input
-    name="signerKeyword"
-    type="text"
-    list="signerList"
-    value={header.signerKeyword}
-    onChange={onSignerChange}
-    disabled={readOnly && !signerEditable}
-    placeholder="พิมพ์ชื่อหรืออีเมล 3+ ตัว"
-    className={inputClass(readOnly && !signerEditable)}
-  />
-
-  {/* only render the datalist if we have suggestions */}
-  {! (readOnly && !signerEditable) && signerList.length > 0 && (
-    <datalist id="signerList">
-      {signerList.flatMap((u) => [
-        <option key={`${u.id}-n`} value={u.employeeName.th ?? u.employeeName.en} />,
-        <option key={`${u.id}-e`} value={u.email} />,
-      ])}
-    </datalist>
-  )}
-
-  {/* once header.signerName is set, show it */}
-  {header.signerName && (
-    <p className="mt-1 text-sm text-gray-500">
-      Signer: {header.signerName} ({header.signerPosition})
-    </p>
-  )}
-  {signerEditable && onSaveSigner && (
-           <button
-             type="button"
-             onClick={onSaveSigner}
-             className="ml-2 mt-1 bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1 rounded"
-          >
-            Save signer           </button>
-        )}
-</div>
           </div>
-
           {/* 1. Accident Details */}
           <section className="bg-blue-50 border border-gray-200 rounded-lg p-6">
             <h2 className="text-lg font-semibold text-gray-700 mb-4">

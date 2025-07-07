@@ -21,13 +21,13 @@ export default function NewCpmPage() {
     approverPosition:"",
     approverKeyword:  "",  
     signerKeyword:   "",
-  signerEmail:     "",
-  signerId:        "",
-  signerName:      "",
-  signerPosition:  "",
+    signerEmail:     "",
+    signerId:        "",
+    signerName:      "",
+    signerPosition:  "",
   });
   const [values, setValues] = useState<CPMFormValues>({
-    accidentDate: "", accidentTime: "", location: "", cause: "",
+    accidentDate: "", accidentTime: "", location: "", cause: "",phoneNum:"",
     repairShop: "", repairShopLocation: "",
     policeDate: "", policeTime: "", policeStation: "",
     damageOwnType: "mitrphol", damageOtherOwn: "",

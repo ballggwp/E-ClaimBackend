@@ -19,6 +19,7 @@ interface Attachment {
   type: "DAMAGE_IMAGE" | "ESTIMATE_DOC" | "OTHER_DOCUMENT";
 }
 interface CpmData {
+  phoneNum:string,
   accidentDate: string;
   accidentTime: string;
   location: string;
@@ -92,6 +93,7 @@ export default function ClaimDetailPage() {
   });
 
   const [values, setValues] = useState<CPMFormValues>({
+    phoneNum:"",
     accidentDate: "",
     accidentTime: "",
     location: "",
@@ -153,6 +155,7 @@ export default function ClaimDetailPage() {
         });
         
         setValues({
+          phoneNum:c.cpmForm.phoneNum,
           accidentDate: c.cpmForm.accidentDate.slice(0, 10),
           accidentTime: c.cpmForm.accidentTime,
           location: c.cpmForm.location,
