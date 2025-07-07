@@ -369,6 +369,7 @@ const otherFiles    = toArray((req.files as any).otherFiles);
 const dateStamp = format(now, "yyyyMMddHHmmss");
     // First, create the CPMForm record
     const {
+      phoneNum,
       accidentDate,
       accidentTime,
       location,
@@ -398,6 +399,7 @@ const dateStamp = format(now, "yyyyMMddHHmmss");
         accidentTime,
         location,
         cause,
+        phoneNum :phoneNum || undefined,
         repairShop: repairShop || null,
         repairShopLocation:repairShopLocation || null,
         policeDate:     policeDate ? new Date(policeDate) : undefined,
@@ -485,6 +487,7 @@ export const updateCpmForm: RequestHandler = async (req, res, next) => {
 
     // Destructure & parse the incoming fields
     const {
+      phoneNum,
       accidentDate,
       accidentTime,
       location,
@@ -515,6 +518,7 @@ export const updateCpmForm: RequestHandler = async (req, res, next) => {
         accidentTime,
         location,
         cause,
+        phoneNum :phoneNum || undefined,
         repairShop: repairShop || null,
         repairShopLocation:repairShopLocation || null,
         policeDate:     policeDate ? new Date(policeDate) : null,
@@ -726,3 +730,4 @@ export const listAttachments: RequestHandler = async (req, res, next) => {
     res.status(500).json({ message: "ไม่สามารถโหลดไฟล์ได้" });
   }
 };
+

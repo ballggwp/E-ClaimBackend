@@ -66,7 +66,6 @@ model Claim {
   categorySub    String?
   submittedAt    DateTime?
   insurerComment String?
-
   attachments Attachment[] @relation("ClaimAttachments")
   cpmForm     CPMForm?
   fppa04Base  Fppa04Base?
@@ -113,7 +112,7 @@ model CPMForm {
   partnerDamageDetail String?
   partnerDamageAmount Float?
   partnerVictimDetail String?
-
+  phoneNum String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
