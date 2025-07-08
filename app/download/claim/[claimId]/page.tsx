@@ -57,7 +57,7 @@ export default function DownloadClaimDetailPage() {
 
   const [claim, setClaim] = useState<ClaimMeta | null>(null);
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
-  const [fppa04ClaimMeta, setFppa04ClaimMeta] = useState<{ approverName: string } | null>(null);
+  const [fppa04ClaimMeta, setFppa04ClaimMeta] = useState<{ approverName: string,signerName:string,signerPosition:string } | null>(null);
   const [fppa04Data, setFppa04Data] = useState<Fppa04CPMData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -134,10 +134,10 @@ export default function DownloadClaimDetailPage() {
     headers:{ Authorization:`Bearer ${session!.user.accessToken}` }
   })
     .then(r => r.ok ? r.json() : null)
-    .then((data: { form: Fppa04CPMData; claim: { approverName: string } } | null) => {
+    .then((data: { form: Fppa04CPMData; claim: { approverName: string,signerName:string,signerPosition:string } } | null) => {
       if (data?.form) {
         setFppa04Data(data.form);
-        setFppa04ClaimMeta({ approverName: data.claim.approverName });
+        setFppa04ClaimMeta({ approverName: data.claim.approverName , signerName:data.claim.signerName,signerPosition:data.claim.signerPosition });
       }
     });
 
@@ -158,7 +158,9 @@ export default function DownloadClaimDetailPage() {
   // spread your FPA04 form data
   ...fppa04Data!,
   // pull approverName from the CPM claim state
-  approverName: claim!.approverName
+  approverName: claim!.approverName,
+  signerName:claim!.signerName,
+  signerPosition:claim!.signerPosition
 }).output("blob") as Blob;
       previewUrl && URL.revokeObjectURL(previewUrl);
       setPreviewUrl(URL.createObjectURL(blob));
@@ -170,7 +172,9 @@ export default function DownloadClaimDetailPage() {
     if (type === 'cpm' && claim) createCPMFormPDF(claim).save(`CPM-${claim.docNum}.pdf`);
     if (type === 'fppa04' && fppa04Data && claim) createFPPA04CPMPDF({
   ...fppa04Data!,
-  approverName: claim!.approverName
+  approverName: claim!.approverName,
+  signerName:claim!.signerName,
+  signerPosition:claim!.signerPosition
 }).save(`FPA04-CPM-${claim!.docNum}.pdf`);
   };
 

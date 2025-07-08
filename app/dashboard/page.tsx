@@ -3,10 +3,13 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, ReactNode } from "react";
 import Link from "next/link";
-
+import { ClaimTimelineWithDates } from "@/components/ClaimTimeline";
+import React from "react";
+import { format, differenceInCalendarDays } from "date-fns";
 interface ClaimSummary {
+  statusDates: Record<string, string>;
   createdById: string;
   id: string;
   docNum: string;
@@ -19,7 +22,14 @@ interface ClaimSummary {
   insurerComment?: string;
   createdByName: string;
 }
-
+const STEPS = [
+  { code: "DRAFT",                    label: "Draft"     },
+  { code: "PENDING_APPROVER_REVIEW",  label: "Approver"  },
+  { code: "PENDING_INSURER_REVIEW",   label: "Insurer"   },
+  { code: "PENDING_MANAGER_REVIEW",   label: "Manager"   },
+  { code: "PENDING_USER_CONFIRM",       label: "Signing"   },
+  { code: "COMPLETED",                label: "Done"      },
+];
 const statusColor = (status: string) => {
   switch (status) {
     case "DRAFT":
@@ -252,7 +262,6 @@ export default function DashboardPage() {
     </div>
   );
 }
-
 function Section({
   title,
   claims,
@@ -262,64 +271,95 @@ function Section({
   claims: ClaimSummary[];
   emptyText: string;
 }) {
-  return (
-    <section className="space-y-4">
-      <h2 className="text-2xl font-semibold text-gray-700">{title}</h2>
-      {claims.length === 0 ? (
+  if (!claims.length) {
+    return (
+      <section className="space-y-4">
+        <h2 className="text-2xl font-semibold text-gray-800">{title}</h2>
         <p className="p-6 text-gray-500">{emptyText}</p>
-      ) : (
-        <div className="overflow-x-auto bg-white rounded-xl shadow">
-          <table className="min-w-full text-sm text-gray-700">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-6 py-3 text-left font-medium">Form ID</th>
-                <th className="px-6 py-3 text-left font-medium">CreatedBy</th>
-                <th className="px-6 py-3 text-left font-medium">Cause</th>
-                <th className="px-6 py-3 text-left font-medium">Date</th>
-                <th className="px-6 py-3 text-left font-medium">Status</th>
-                <th className="px-6 py-3 text-left font-medium">Comment</th>
-                <th className="px-6 py-3 text-left font-medium">FPPA-04</th>
-              </tr>
-            </thead>
-            <tbody>
-              {claims.map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50 border-t">
-                  <td className="px-6 py-3">
-                    <Link
-                      href={`/claims/cpm/${c.id}`}
-                      className="text-blue-600 hover:underline"
-                    >
-                      {c.docNum}
-                    </Link>
-                  </td>
-                  <td className="px-6 py-3">{c.createdByName}</td>
-                  <td className="px-6 py-3">
-                    {c.cause ?? <span className="text-gray-400">—</span>}
-                  </td>
-                  <td className="px-6 py-3">
-                    {new Date(c.submittedAt || c.createdAt).toLocaleDateString(
-                      "th-TH"
-                    )}
-                  </td>
-                  <td className="px-6 py-3">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColor(
-                        c.status
-                      )}`}
-                    >
-                      {c.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3 text-sm text-gray-600">
-                    {c.insurerComment ? (
-                      <span className="block truncate max-w-xs">
-                        {c.insurerComment}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-3">
+      </section>
+    );
+  }
+
+  return (
+    <section className="space-y-10">
+      <h2 className="text-2xl font-semibold text-gray-800">{title}</h2>
+      <div className="space-y-6">
+        {claims.map((c) => {
+          // compute days passed
+          const daysPassed = differenceInCalendarDays(
+            new Date(),
+            new Date(c.createdAt)
+          );
+          // compute next status label
+          const STEPS = [
+            "SUBMITTED",
+            "PENDING_APPROVER_REVIEW",
+            "PENDING_INSURER_REVIEW",
+            "PENDING_MANAGER_REVIEW",
+            "PENDING_USER_CONFIRM",
+            "COMPLETED",
+          ];
+          const idx = STEPS.indexOf(c.status);
+          const nextLabel =
+            idx >= 0 && idx < STEPS.length - 1
+              ? STEPS[idx + 1]
+                  .split("_")
+                  .map((w) => w[0] + w.slice(1).toLowerCase())
+                  .join(" ")
+              : "—";
+
+          return (
+            <div
+              key={c.id}
+              className="bg-white rounded-xl shadow-md hover:shadow-xl transition p-6"
+            >
+              {/* Header */}
+              <div className="flex justify-between items-center mb-4">
+                <Link
+                  href={`/claims/cpm/${c.id}`}
+                  className="text-xl text-blue-600 font-semibold hover:underline"
+                >
+                  {c.docNum}
+                </Link>
+                <span
+                  className={`
+                    px-3 py-1 rounded-full text-xs font-semibold
+                    ${statusColor(c.status)}
+                  `}
+                >
+                  {c.status.replace(/_/g, " ")}
+                </span>
+              </div>
+
+              {/* Timeline */}
+              <ClaimTimelineWithDates
+                statusDates={c.statusDates}
+                currentStatus={c.status}
+              />
+
+              {/* Details grid */}
+              <dl className="mt-6 grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                <div>
+                  <dt className="font-medium text-gray-600">Created By</dt>
+                  <dd className="mt-1 text-gray-900">{c.createdByName}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-gray-600">Cause</dt>
+                  <dd className="mt-1 text-gray-900">{c.cause ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-gray-600">จำนวนวัน</dt>
+                  <dd className="mt-1 text-gray-900">{daysPassed}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-gray-600">Comment</dt>
+                  <dd className="mt-1 text-gray-900">
+                    {c.insurerComment ?? "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-gray-600">FPPA-04</dt>
+                  <dd className="mt-1">
                     {fppaLinkStatuses.includes(c.status) ? (
                       <Link
                         href={`/fppa04/${c.categorySub}/${c.id}`}
@@ -328,15 +368,16 @@ function Section({
                         ดูฟอร์ม
                       </Link>
                     ) : (
-                      <span className="text-gray-400">—</span>
+                      "—"
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }
+
