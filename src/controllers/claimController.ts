@@ -43,7 +43,7 @@ export const listClaims: RequestHandler = async (req, res, next) => {
       select: {
         id: true,
         docNum: true,
-        approverId: true,             // so the front end can match session.user.id
+        approverId: true,
         categorySub: true,
         status: true,
         createdAt: true,
@@ -51,25 +51,39 @@ export const listClaims: RequestHandler = async (req, res, next) => {
         insurerComment: true,
         createdBy: { select: { name: true } },
         cpmForm: { select: { cause: true } },
-        categoryMain:true,
-        updatedAt: true, 
+        categoryMain: true,
+        updatedAt: true,
+       history: {
+      select: {
+        status:    true,
+        createdAt: true,
       },
+      orderBy: { createdAt: "asc" },
+    },       // ← include the history rows
+      }
     })
 
-    // flatten for JSON
-    const claims = dbClaims.map(c => ({
-      id:             c.id,
-      docNum:         c.docNum,
-      approverId:     c.approverId,
-      categorySub:    c.categorySub,
-      status:         c.status,
-      createdAt:      c.createdAt.toISOString(),
-      submittedAt:    c.submittedAt?.toISOString() ?? null,
-      insurerComment: c.insurerComment,
-      createdByName:  c.createdBy.name,
-      cause:          c.cpmForm?.cause ?? null,
-      updatedAt:     c.updatedAt.toISOString(),
-    }))
+    const claims = dbClaims.map(c => {
+      const statusDates: Record<string,string> = {}
+      c.history.forEach(h => {
+        statusDates[h.status] = h.createdAt.toISOString()
+      })
+
+      return {
+        id:             c.id,
+        docNum:         c.docNum,
+        approverId:     c.approverId,
+        categorySub:    c.categorySub,
+        status:         c.status,
+        createdAt:      c.createdAt.toISOString(),
+        submittedAt:    c.submittedAt?.toISOString() ?? null,
+        insurerComment: c.insurerComment,
+        createdByName:  c.createdBy.name,
+        cause:          c.cpmForm?.cause ?? null,
+        updatedAt:      c.updatedAt.toISOString(),
+        statusDates    // ← your new timeline map
+      }
+    })
 
     res.json({ claims })
   } catch (err) {
@@ -158,6 +172,12 @@ if (!creator) {
         submittedAt: saveAsDraft === "true" ? null : new Date(),
       },
     });
+    await prisma.claimHistory.create({
+   data: {
+     claimId: claim.id,
+     status:  claim.status
+   }
+ })
 
     res.json({ claim });
   } catch (err) {
@@ -319,33 +339,28 @@ export const claimAction: RequestHandler = async (req, res, next) => {
 
 // ─── Manager Actions ──────────────────────────────────────────────────────────
 export const ManagerAction: RequestHandler = async (req, res, next) => {
-  console.log("approve");
   try {
-    const { id } = req.params;
-    const { action, comment } = req.body as { action: 'approve'|'reject'; comment: string };
-    if (!['approve','reject'].includes(action)) {
-      res.status(400).json({ message: 'Invalid action' });
-      return;
-    }
-
+    const { id } = req.params
+    const { action, comment } = req.body as { action: 'approve'|'reject'; comment?: string }
     const newStatus = action === 'approve'
       ? ClaimStatus.PENDING_USER_CONFIRM
-      : ClaimStatus.PENDING_INSURER_REVIEW;
+      : ClaimStatus.PENDING_INSURER_REVIEW
 
-    const updated = await prisma.claim.update({
-      where: { id },
-      data: {
-        status: newStatus,
-        insurerComment: comment,
-      },
-      select: { id: true, status: true, insurerComment: true }
-    });
+    const [updated] = await prisma.$transaction([
+      prisma.claim.update({
+        where: { id },
+        data: { status: newStatus, insurerComment: comment }
+      }),
+      prisma.claimHistory.create({
+        data: { claimId: id, status: newStatus }
+      })
+    ])
 
-    res.json({ claim: updated });
+    res.json({ claim: updated })
   } catch (err) {
-    next(err);
+    next(err)
   }
-};
+}
 
 // ─── Create CPM Form ──────────────────────────────────────────────────────────
 // src/controllers/claimController.ts
@@ -589,39 +604,41 @@ export const updateCpmForm: RequestHandler = async (req, res, next) => {
 };
 export const approverAction: RequestHandler = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const { action, comment } = req.body as { action: 'approve' | 'reject'; comment?: string };
+    const { id } = req.params
+    const { action, comment } = req.body as { action: 'approve'|'reject'; comment?: string }
 
-    // validate action
-    if (!['approve', 'reject'].includes(action)) {
-      res.status(400).json({ message: 'Invalid action' });
-      return;
+    let newStatus: ClaimStatus
+    switch (action) {
+      case "approve":
+        newStatus = ClaimStatus.PENDING_INSURER_REVIEW
+        break
+      case "reject":
+        newStatus = ClaimStatus.REJECTED
+        break
+      default:
+        res.status(400).json({ message: "Unknown action" })
+        return
     }
 
-    // determine new status
-    const newStatus = action === 'approve'
-      ? ClaimStatus.PENDING_INSURER_REVIEW
-      : ClaimStatus.REJECTED;
+    // transaction: update + history
+    const [updated] = await prisma.$transaction([
+      prisma.claim.update({
+        where: { id },
+        data: {
+          status: newStatus,
+          ...(comment && { insurerComment: comment })
+        }
+      }),
+      prisma.claimHistory.create({
+        data: { claimId: id, status: newStatus }
+      })
+    ])
 
-    // update claim
-    const updated = await prisma.claim.update({
-      where: { id },
-      data: {
-        status: newStatus,
-        ...(comment && { insurerComment: comment }),
-      },
-      select: {
-        id: true,
-        status: true,
-        insurerComment: true,
-      },
-    });
-
-    res.json({ claim: updated });
+    res.json({ claim: updated })
   } catch (err) {
     next(err);
   }
-};
+}
 
 export const updateSigner: RequestHandler = async (req, res, next) => {
   const { id } = req.params;
@@ -686,17 +703,18 @@ export const userConfirm: RequestHandler = async (req, res, next) => {
       await prisma.attachment.createMany({ data: creates });
     }
 
-    await prisma.claim.update({
-      where: { id: req.params.id },
-      data: {
-        status: action === 'confirm'
-          ? ClaimStatus.COMPLETED    // now it really will go to COMPLETED
-          : ClaimStatus.PENDING_INSURER_REVIEW,
-        ...(action === 'reject' && comment
-          ? { insurerComment: `User–${comment}` }
-          : {}),
-      },
-    });
+    await prisma.$transaction([
+  prisma.claim.update({
+    where: { id:req.params.id },
+    data: {
+      status: action === 'confirm' ? ClaimStatus.COMPLETED : ClaimStatus.PENDING_INSURER_REVIEW,
+      ...(action === 'reject' && { insurerComment: `User–${comment}` })
+    }
+  }),
+  prisma.claimHistory.create({
+    data: { claimId: req.params.id, status: action === 'confirm' ? ClaimStatus.COMPLETED : ClaimStatus.PENDING_INSURER_REVIEW }
+  })
+])
 
     res.json({ success: true });
   } catch (err) {
