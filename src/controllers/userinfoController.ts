@@ -15,7 +15,7 @@ export const getUserInfo: RequestHandler = async (req, res, next) => {
 
     // map to a flat shape for the client
     const profiles = raw.map((p: any) => ({
-      department : p.department,
+      department : p.department?.name.th||p.department?.name.en||p.departmentName,
       id:           p.id,
       email:        p.email,
       name:         p.employeeName?.th || p.employeeName?.en || p.name,

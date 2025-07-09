@@ -53,6 +53,7 @@ model Claim {
   createdByName String
   approverName  String
   approverPosition String
+  approverDepartment String
   createdById   String
   approverEmail  String
   createdBy     User   @relation("ClaimsCreated", fields: [createdById], references: [id])

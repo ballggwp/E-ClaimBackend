@@ -44,7 +44,8 @@ export const listApprovers: RequestHandler = async (req, res, next) => {
     const users = result.map(u => ({
       id:       u.id,                        // e.g. "00000009"
       name:     u.employeeName.th,           // ไทยชื่อ
-      position: u.position.name.th,          // ตำแหน่งไทย       // or derive from u.role if you have it
+      position: u.position.name.th,  
+      department : u.department.name.th        // ตำแหน่งไทย       // or derive from u.role if you have it
     }));
 
     res.json({ users });

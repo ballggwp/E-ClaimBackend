@@ -1,6 +1,6 @@
 // src/controllers/fppa04Controller.ts
 import type { RequestHandler } from "express";
-import { Prisma } from "@prisma/client";
+import { Prisma, ClaimStatus, AttachmentType } from "@prisma/client";
 import prisma from "../lib/prisma";
 
 // ─── Create FPPA-04 Base ───────────────────────────────────────────────────────
@@ -29,6 +29,7 @@ export const createFppa04Base: RequestHandler = async (req, res, next) => {
         // put those fields here.  Otherwise, leave this empty to just leave the existing row untouched:
       },
     });
+    
     res.status(200).json({ base });
     return;
   } catch (err) {
@@ -49,6 +50,7 @@ export const getFppa04Base: RequestHandler = async (req, res, next) => {
             cpmForm: { select: { cause: true } },
             id:           true,
             approverName: true,
+            signerName:true,
             status:       true,
             categoryMain: true,
             categorySub:  true,
@@ -194,6 +196,10 @@ export const createFppa04Cpm: RequestHandler = async (req, res, next) => {
       where: { id: req.params.id },
       data: { status: 'PENDING_MANAGER_REVIEW' },
     });
+    await prisma.claimHistory.create({
+      data: { claimId, status: ClaimStatus.PENDING_MANAGER_REVIEW },
+    });
+    
 
     res.json({ cpm });
   } catch (err) {

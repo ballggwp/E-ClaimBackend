@@ -106,27 +106,21 @@ export const createClaim: RequestHandler = async (req, res, next) => {
       approverId,
       approverEmail,
       approverPosition,
+      approverDepartment: deptPayload,
       approverName,
       saveAsDraft,
       signerId,
     signerEmail,
     signerName,
     signerPosition,
-    } = req.body as {
+    } = req.body as any;
 
-      categoryMain: string;
-      categorySub:  string;
-      approverId:   string;
-      approverName:string
-      approverEmail: string;
-      approverPosition:string,
-      saveAsDraft:  string;
-      signerId:  string,
-    signerEmail:  string,
-    signerName:  string,
-    signerPosition:  string,
-    };
-
+     const approverDepartment: string =
+      typeof deptPayload === "string"
+        ? deptPayload
+        : typeof deptPayload === "object" && deptPayload !== null
+        ? deptPayload.name?.th || deptPayload.name?.en || String(deptPayload)
+        : String(deptPayload);
     const createdById = req.user!.id;
 const creator = await prisma.user.findUnique({ where: { id: createdById } });
 if (!creator) {
@@ -157,6 +151,7 @@ if (!creator) {
         approverId,
         approverName: approverName,
         approverPosition:approverPosition,
+        approverDepartment: approverDepartment,
         /** ← new required field: */
         approverEmail,
         signerId,
@@ -194,35 +189,50 @@ export const getClaim: RequestHandler = async (req, res, next) => {
     const claim = await prisma.claim.findUnique({
       where: { id },
       include: {
-        createdBy: { select: { name: true, id: true } },
-        attachments: true,    // assuming this is a relation
-        cpmForm:    true,     // relation
-        fppa04Base: {          // relation
+        history: {
+          select: { status: true, createdAt: true },
+          orderBy: { createdAt: "asc" },
+        },
+        createdBy:   { select: { name: true, id: true } },
+        attachments: true,
+        cpmForm:     true,
+        fppa04Base: {
           include: {
             cpmVariant: {
-              include: {
-                items:       true,
-                adjustments: true,
-              }
+              include: { items: true, adjustments: true }
             }
           }
         },
       },
     });
-if (!claim) {
-  res.status(404).json({ message: "Not found" });
-  return;
-}
-    const claimWithCause = {
-      ...claim.cpmForm,
-      cause: claim.cpmForm?.cause ?? "",
-    };
-    res.json({ claim, claimWithCause });
+
+    if (!claim) {
+      res.status(404).json({ message: "Not found" });
+      return;
+    }
+
+    // build the statusDates map
+    const statusDates: Record<string, string> = {};
+    claim.history.forEach((h) => {
+      statusDates[h.status] = h.createdAt.toISOString();
+    });
+
+    // strip out `history` (or leave it) and return statusDates
+    const { history, ...rest } = claim;
+    res.json({
+      claim: {
+        ...rest,
+        statusDates,
+      },
+      claimWithCause: {
+        ...claim.cpmForm!,
+        cause: claim.cpmForm?.cause ?? "",
+      },
+    });
   } catch (err) {
     next(err);
   }
 };
-
 
 // ─── Update Claim (header + nested CPMForm upsert) ────────────────────────────
 export const updateClaim: RequestHandler = async (req, res, next) => {
@@ -254,7 +264,7 @@ export const updateClaim: RequestHandler = async (req, res, next) => {
     if (approverId) {
       const approver = await prisma.user.findUnique({
         where:  { id: approverId },
-        select: { name: true ,position:true},
+        select: { name: true ,position:true,department:true},
       });
       if (!approver) {
         res.status(400).json({ message: "Approver not found" });
@@ -264,6 +274,7 @@ export const updateClaim: RequestHandler = async (req, res, next) => {
         approverId,
         approverName: approver.name,
         approverPosition:approver.position,
+        approverDepartment: approver.department,
       });
     }
 
@@ -322,16 +333,21 @@ export const claimAction: RequestHandler = async (req, res, next) => {
         return;
     }
 
-    const updated = await prisma.claim.update({
-      where: { id },
-      data: {
-        status: newStatus,
-        ...(comment && { insurerComment: comment }),
-      },
-      include: { attachments: true },
-    });
+    const [updatedClaim] = await prisma.$transaction([
+      prisma.claim.update({
+        where: { id },
+        data: {
+          status: newStatus,
+          ...(comment && { insurerComment: comment }),
+        },
+        include: { attachments: true },
+      }),
+      prisma.claimHistory.create({
+        data: { claimId: id, status: newStatus },
+      }),
+    ]);
 
-    res.json({ claim: updated });
+    res.json({ claim: updatedClaim });
   } catch (err) {
     next(err);
   }
