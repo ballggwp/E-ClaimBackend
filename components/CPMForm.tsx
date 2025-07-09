@@ -3,12 +3,13 @@
 import React, { ChangeEvent, ChangeEventHandler } from "react";
 import Swal from "sweetalert2";
 import { motion } from "framer-motion";
-
+import ThaiDatePicker from "@/components/ThaiDatePicker";
 export interface User {
   id: string;
   employeeName: { th?: string; en?: string };
   position: string;
   email: string;
+  department: string; // Optional, in case some users don't have a department
   role: "USER" | "MANAGER" | "INSURANCE";
 }
 
@@ -52,6 +53,7 @@ interface CPMFormProps {
     approverEmail: string;
     approverId: string;
     approverName: string;
+    approverDepartment: string;
     approverPosition: string;
     signerEmail: string;
     signerId: string;
@@ -291,17 +293,17 @@ export default function CPMForm({
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm text-gray-600 mb-1">
-                  วันที่เกิดเหตุ <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  name="accidentDate"
-                  value={values.accidentDate || ""}
-                  onChange={onChange}
-                  disabled={readOnly}
-                  className={inputClass(readOnly)}
-                />
+                 <ThaiDatePicker
+    name="accidentDate"
+    label="วันที่เกิดเหตุ"
+    value={values.accidentDate}
+    onChange={(iso) =>
+      // wrap into a fake ChangeEvent so your existing onChange handler still works
+      onChange({ target: { name: "accidentDate", value: iso } } as any)
+    }
+    disabled={readOnly}
+    inputClass={inputClass(readOnly)}
+  />
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">
@@ -351,17 +353,16 @@ export default function CPMForm({
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm text-gray-600 mb-1">
-                  วันที่แจ้ง <span className="text-gray-500">(ถ้ามี)</span>
-                </label>
-                <input
-                  type="date"
-                  name="policeDate"
-                  value={values.policeDate || ""}
-                  onChange={onChange}
-                  disabled={readOnly}
-                  className={inputClass(readOnly)}
-                />
+                <ThaiDatePicker
+    name="policeDate"
+    label="วันที่แจ้ง"
+    value={values.policeDate}
+    onChange={(iso) =>
+      onChange({ target: { name: "policeDate", value: iso } } as any)
+    }
+    disabled={readOnly}
+    inputClass={inputClass(readOnly)}
+  />
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">เวลา</label>

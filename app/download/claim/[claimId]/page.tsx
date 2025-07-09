@@ -18,6 +18,7 @@ interface AttachmentItem {
 }
 
 interface ClaimMeta {
+  approverDepartment:string;
   createdAt: string;
   signerPosition: string;
   phoneNum: string;
@@ -48,6 +49,8 @@ interface ClaimMeta {
   partnerDamageDetail?: string;
   partnerDamageAmount?: number;
   partnerVictimDetail?: string;
+  datePendingManager: string;   // ISO when status went to PENDING_MANAGER_REVIEW
+  dateCompleted:      string; 
 }
 
 export default function DownloadClaimDetailPage() {
@@ -76,7 +79,14 @@ export default function DownloadClaimDetailPage() {
     OTHER_DOCUMENT:   FileText,
     USER_CONFIRM_DOC: CheckCircle,
   };
-
+  function fmtBE(iso?: string) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("th-TH-u-ca-buddhist", {
+    day:   "2-digit",
+    month: "2-digit",
+    year:  "numeric",
+  });
+}
   useEffect(() => {
     if (status !== 'authenticated') return;
     setLoading(true);
@@ -87,8 +97,12 @@ export default function DownloadClaimDetailPage() {
     })
       .then(r => { if (!r.ok) throw new Error('ไม่พบข้อมูลฟอร์ม'); return r.json(); })
       .then(({ claim }) => {
+        const dates = claim.statusDates || {};console.log(dates)
         const form = claim.cpmForm;
         setClaim({
+          datePendingManager: fmtBE(dates["PENDING_MANAGER_REVIEW"]),
+    dateCompleted:      fmtBE(dates["COMPLETED"]),       
+          approverDepartment:claim.approverDepartment,
           createdAt:          form.createdAt,
           signerPosition:    claim.signerPosition,
           phoneNum:          form.phoneNum ?? '',
@@ -133,6 +147,7 @@ export default function DownloadClaimDetailPage() {
     const fetchFppa04 = fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/fppa04/${claimId}`, {
     headers:{ Authorization:`Bearer ${session!.user.accessToken}` }
   })
+  
     .then(r => r.ok ? r.json() : null)
     .then((data: { form: Fppa04CPMData; claim: { approverName: string,signerName:string,signerPosition:string } } | null) => {
       if (data?.form) {
@@ -153,7 +168,7 @@ export default function DownloadClaimDetailPage() {
       setPreviewUrl(URL.createObjectURL(blob));
       setPreviewType('cpm');
     }
-    if (type === 'fppa04' && fppa04Data) {
+    if (type === 'fppa04' && fppa04Data && claim) {
       const blob = createFPPA04CPMPDF({
   // spread your FPA04 form data
   ...fppa04Data!,
@@ -190,8 +205,8 @@ export default function DownloadClaimDetailPage() {
       <div className="flex space-x-4 mb-8">
         <button onClick={()=>handlePreview('cpm')}                    className="bg-gray-200 text-gray-800 py-3 px-6 rounded-lg">🔍 ดู CPM</button>
         <button onClick={()=>handleDownload('cpm')}                   className="bg-blue-600 text-white py-3 px-6 rounded-lg">📄 ดาวน์โหลด CPM</button>
-        <button onClick={()=>handlePreview('fppa04')}                 disabled={!fppa04Data} className="bg-gray-200 text-gray-800 py-3 px-6 rounded-lg">🔍 ดู FPA04</button>
-        <button onClick={()=>handleDownload('fppa04')}                disabled={!fppa04Data} className="bg-green-600 text-white py-3 px-6 rounded-lg">📄 ดาวน์โหลด FPA04</button>
+        <button onClick={()=>handlePreview('fppa04')}                 disabled={!claim || !fppa04Data} className="bg-gray-200 text-gray-800 py-3 px-6 rounded-lg">🔍 ดู FPA04</button>
+        <button onClick={()=>handleDownload('fppa04')}                disabled={!claim || !fppa04Data} className="bg-green-600 text-white py-3 px-6 rounded-lg">📄 ดาวน์โหลด FPA04</button>
       </div>
 
       {previewUrl && (

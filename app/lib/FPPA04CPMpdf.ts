@@ -25,7 +25,17 @@ export interface Fppa04CPMData {
   surveyorRefNumber: string;
   items: Fppa04ItemCPM[];
   adjustments: Fppa04AdjustmentCPM[];
+  datePendingManager: string;   // ISO when status went to PENDING_MANAGER_REVIEW
+  dateCompleted:      string; 
 }
+
+const fmtDate = (iso: string) =>
+  new Date(iso)
+    .toLocaleDateString("th-TH-u-ca-buddhist", {
+      day:   "2-digit",
+      month: "2-digit",
+      year:  "numeric",
+    })
 
 export function createFPPA04CPMPDF(data: Fppa04CPMData) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
@@ -229,18 +239,23 @@ const netAmountStr       = Number(data.netAmount       || 0).toFixed(2);
   yMiddle: sigY + cellHeight / 1.5-1,            // ชื่อกึ่งกลาง
   yBottom: sigY + cellHeight - 6             // วันที่จะอยู่ห่างจากล่างกรอบ 6 มม.
 }));
-
+const signerPositionLines = doc
+  .splitTextToSize(data.signerPosition, cellWidth - 8)
 const titles = [
   'ฝ่ายประกันภัยกลุ่ม',
   'ผู้ตรวจสอบ',
-  data.signerPosition
+  signerPositionLines
 ];
 const names = [
   'สุวิมล ว่องกุศลกิจ',
-  data.signerName.replace(/^(นาย|นางสาว|นาง)\s*/, ''),
-  data.approverName.replace(/^(นาย|นางสาว|นาง)\s*/, '')
+  data.approverName.replace(/^(นาย|นางสาว|นาง)\s*/, ''),
+  data.signerName.replace(/^(นาย|นางสาว|นาง)\s*/, '')
 ];
-const dateLabel = 'วันที่ ........ / ........ / ........';
+const labels = [
+  fmtDate(data.datePendingManager),
+  fmtDate(data.dateCompleted),         // for “ผู้ตรวจสอบ”
+  fmtDate(data.dateCompleted),         // for “ผู้เซ็น” (same as completed)
+];
 
 for (let i = 0; i < 3; i++) {
   const leftX  = startX + i * cellWidth;
@@ -249,7 +264,7 @@ for (let i = 0; i < 3; i++) {
 
   // 1) หัวคอลัมน์ (title)
   doc.setFont('THSarabunNew','bold').setFontSize(12);
-  doc.text(titles[i], c.x, c.yTop, { align: 'center' });
+  doc.text(titles[i], c.x, c.yTop-2, { align: 'center' });
 
   // 2) เส้นแบ่ง (divider) 
   const dividerY = c.yTop + 4;      // ปรับระยะตามดีไซน์
@@ -263,7 +278,7 @@ for (let i = 0; i < 3; i++) {
 
   // 4) วันที่
   doc.setFontSize(10);
-  doc.text(dateLabel, c.x, c.yBottom, { align: 'center' });
+  doc.text(labels[i], c.x, c.yBottom, { align: 'center' });
 }
 // ===== 1) หัวตาราง สำหรับฝ่ายประกันภัยกลุ่ม =====
 const tableY    = (doc as any).lastAutoTable.finalY + 50;

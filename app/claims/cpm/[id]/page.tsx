@@ -11,6 +11,7 @@ import CPMForm, {
 } from "@/components/CPMForm";
 import Swal from "sweetalert2";
 import { fetchJson } from "@/app/lib/fetchJson";
+import { deprecate } from "util";
 
 interface Attachment {
   id: string;
@@ -53,6 +54,7 @@ interface ClaimPayload {
   categorySub: string;
   approverId: string;
   approverPosition: string;
+  approverDepartment: string;
   createdByEmail: string;
   createdByName: string;
   insurerComment?: string;
@@ -85,6 +87,7 @@ export default function ClaimDetailPage() {
     categorySub: "",
     approverId: "",
     approverPosition: "",
+    approverDepartment: "",
     approverName: "",
     signerEmail:"",
     signerId: "",
@@ -140,6 +143,7 @@ export default function ClaimDetailPage() {
         if (!c.cpmForm) throw new Error("CPM form is missing on this claim");
         setClaim(c);
         setHeader({
+          approverDepartment: c.approverDepartment,
           categoryMain: c.categoryMain,
           categorySub: c.categorySub,
           approverId: c.approverId,
@@ -197,6 +201,7 @@ export default function ClaimDetailPage() {
         email:        u.email,
         role:         "USER",
         position:     u.position,
+        department:   u.department || "",
         employeeName: { th: u.name, en: u.name },
       }));
 
@@ -277,6 +282,7 @@ useEffect(() => {
         email:        p.email,
         role:         "USER",
         position:     p.position,
+        department:   p.department || "",
         employeeName: { th: p.name, en: p.name },
       }));
       if (!cancelled) setSignerSuggestions(users);

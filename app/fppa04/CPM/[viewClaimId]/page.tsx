@@ -8,6 +8,7 @@ import { CheckCircle, XCircle } from "lucide-react";
 import Link from "next/link";
 
 interface ViewDefaults {
+  signerName:string;
   docNum: string;
   cause: string;
   approverName: string;
@@ -55,6 +56,7 @@ export default function ViewCPMPage() {
         if (!res.ok) throw new Error(await res.text());
         const { form, claim } = await res.json();
         setDefaults({
+          signerName:claim.signerName,
           docNum: claim.docNum,
           cause: claim.cpmForm.cause,
           approverName: claim.approverName,
@@ -334,48 +336,7 @@ export default function ViewCPMPage() {
         </div>
       )}
 
-      {/* Display files for other statuses */}
-      {defaults.status !== "PENDING_USER_CONFIRM" && (
-  <div>
-    <label className="block text-sm font-medium text-gray-700">
-      เอกสารที่แนบมา
-    </label>
-    {/* ตรวจสอบว่า signatureUrls มีค่าหรือไม่ และเป็นอาเรย์ที่มีขนาดมากกว่า 0 */}
-    {Array.isArray(initial?.signatureUrls) && initial.signatureUrls.length > 0 ? (
-      <div className="grid grid-cols-4 gap-4 mt-4">
-        {initial.signatureUrls.map((url, index) => {
-          const isImage = /\.(jpe?g|png|gif|bmp|webp)$/i.test(url); // ตรวจสอบว่าเป็นภาพหรือไม่
-          return (
-            <div key={index} className="border rounded-lg p-2 bg-white flex flex-col items-center">
-              {isImage ? (
-                // รูปภาพเมื่อคลิกแล้วเปิดในหน้าต่างใหม่
-                <a href={url} target="_blank" rel="noopener noreferrer">
-                  <img
-                    src={url}
-                    className="h-24 object-contain mb-2 cursor-pointer"
-                    alt={`Document ${index + 1}`}
-                  />
-                </a>
-              ) : (
-                // ไฟล์อื่นๆ เช่น เอกสาร
-                <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center h-24 w-full">
-                  <div className="flex items-center justify-center text-4xl text-gray-600">
-                    📄
-                  </div>
-                </a>
-              )}
-              <p className="text-xs text-gray-700 truncate w-full text-center">Document {index + 1}</p>
-              <p className="text-[10px] text-gray-500">{(url.length / 1024).toFixed(1)} KB</p>
-              {/* ไม่มีปุ่มลบ */}
-            </div>
-          );
-        })}
-      </div>
-    ) : (
-      <div className="text-center text-gray-500">ไม่มีเอกสารที่แนบมา</div>
-    )}
-  </div>
-)}
+      
 
 
       {/* Image Modal for Inspection */}

@@ -18,6 +18,7 @@ export default function NewCpmPage() {
     approverEmail: "",
     approverId:    "",
     approverName:  "",
+    approverDepartment:"",
     approverPosition:"",
     approverKeyword:  "",  
     signerKeyword:   "",
@@ -55,6 +56,7 @@ export default function NewCpmPage() {
       approverId:       "",
       approverName:     "",
       approverPosition: "",
+      approverDepartment:"",
     }));
 
     // if they typed exactly one of the suggestions, finalize the pick immediately
@@ -72,6 +74,8 @@ export default function NewCpmPage() {
       approverId:       hit.id,
       approverName:     hit.employeeName.th || hit.employeeName.en!,
       approverPosition: hit.position,
+      approverDepartment: hit.department || "",
+
     }));
     setSuggestions([]);  // close the dropdown
   }
@@ -98,6 +102,7 @@ export default function NewCpmPage() {
           email:        p.email,
           role:         "USER",
           position:     p.position,
+          department:   p.department.name.th,
           employeeName: { th: p.name, en: p.name },
         }));
         if (!cancelled) setSuggestions(users);
@@ -161,6 +166,7 @@ useEffect(() => {
         email:        p.email,
         role:         "USER",
         position:     p.position,
+        department:   p.department.name.th,
         employeeName: { th: p.name, en: p.name },
       }));
       if (!cancelled) setSignerSuggestions(users);
@@ -173,7 +179,7 @@ useEffect(() => {
 
 
 console.log( header.signerName,header.signerEmail,header.signerId,header.signerPosition);
-  console.log( header.approverName,header.approverEmail,header.approverId,header.approverPosition);
+  console.log( header.approverName,header.approverEmail,header.approverId,header.approverPosition,header.approverDepartment);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement|HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -209,6 +215,7 @@ console.log( header.signerName,header.signerEmail,header.signerId,header.signerP
           approverId:    header.approverId,
           approverName:  header.approverName,
           approverPosition:    header.approverPosition,
+          approverDepartment: header.approverDepartment,
           saveAsDraft:   saveAsDraft.toString(),
           approverKeyword:  header.approverKeyword,
           signerEmail:    header.signerEmail,
@@ -251,6 +258,7 @@ console.log( header.signerName,header.signerEmail,header.signerId,header.signerP
         approverId:    header.approverId,
         approverName:  header.approverName,
         approverPosition:header.approverPosition,
+        approverDepartment:header.approverDepartment,
         approverKeyword: header.approverKeyword,
         signerEmail:    header.signerEmail,
   signerId:       header.signerId,

@@ -12,6 +12,7 @@ export interface CPMFormPDFData {
   approverName: string;
   signerName: string;
   approverPosition: string;
+  approverDepartment: string;
   createdByName: string;
   accidentDate: string;
   accidentTime: string;
@@ -111,7 +112,7 @@ export function createCPMFormPDF(data: CPMFormPDFData) {
   doc.text("สาเหตุของอุบัติเหตุ", 10, y);
   doc.setFont("THSarabunNew", "normal");
   doc.setTextColor(0, 0, 255);
-  const causeLines = doc.splitTextToSize(data.cause || "-", 140);
+  const causeLines = doc.splitTextToSize(data.cause || "-", 160);
 
   doc.text(causeLines, 40, y);
   y += 8;
@@ -200,7 +201,7 @@ export function createCPMFormPDF(data: CPMFormPDFData) {
   y += 8;
   doc.setFont("THSarabunNew", "normal");
   doc.setTextColor(0, 0, 255);
-  const causedatail = doc.splitTextToSize(data.damageDetail || "-", 140);
+  const causedatail = doc.splitTextToSize(data.damageDetail || "-", 200);
 
   doc.text(causedatail, 10, y);
   y += 8;
@@ -294,7 +295,7 @@ export function createCPMFormPDF(data: CPMFormPDFData) {
   doc.setFontSize(16);
   doc.setTextColor(0, 0, 255);
   doc.setFont("THSarabunNew", "normal");
-  doc.text(`${data.createdByName || "–"} `, 60, y);
+  doc.text(`${data.approverName || "–"} `, 60, y);
   doc.setFontSize(16);
   doc.setTextColor(0, 0, 0);
   doc.setFont("THSarabunNew", "normal");
@@ -302,7 +303,7 @@ export function createCPMFormPDF(data: CPMFormPDFData) {
   doc.setFontSize(16);
   doc.setTextColor(0, 0, 255);
   doc.setFont("THSarabunNew", "normal");
-  doc.text(`${data.position || "–"} `, 130, y);
+  doc.text(`${data.approverPosition || "–"} `, 130, y);
   y += 8;
   doc.setFontSize(16);
   doc.setTextColor(0, 0, 0);
@@ -311,7 +312,7 @@ export function createCPMFormPDF(data: CPMFormPDFData) {
   doc.setFontSize(16);
   doc.setTextColor(0, 0, 255);
   doc.setFont("THSarabunNew", "normal");
-  doc.text(`${data.department || "–"} `, 30, y);
+  doc.text(`${data.approverDepartment || "–"} `, 30, y);
   doc.setFontSize(16);
   doc.setTextColor(0, 0, 0);
   doc.setFont("THSarabunNew", "normal");
@@ -332,7 +333,7 @@ export function createCPMFormPDF(data: CPMFormPDFData) {
   y = 265;
   doc.setFontSize(16);
   const prefix = "ลงชื่อ ";
-  const name = data.createdByName;
+  const name = data.approverName;
   const suffix = " ผู้รายงาน";
 
   // 1) prefix in black
@@ -350,7 +351,7 @@ export function createCPMFormPDF(data: CPMFormPDFData) {
   doc.setTextColor(0, 0, 0);
   doc.text(suffix, 120 + prefixWidth + nameWidth, y);
   y += 8;
-  doc.text(`(${data.createdByName})`, 130, y);
+  doc.text(`(${data.approverName})`, 130, y);
   y += 8;
   const [datePart] = data.createdAt.split(" ");
   const parsed = new Date(datePart);
