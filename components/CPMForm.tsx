@@ -201,7 +201,7 @@ export default function CPMForm({
     {/* Approver */}
     <div>
       <label className="block text-sm font-medium text-gray-600 mb-1">
-        ผู้อนุมัติเอกสาร (EMAIL) <span className="text-red-500">*</span>
+        ผู้รายงาน (EMAIL) <span className="text-red-500">*</span>
       </label>
       <input
         disabled={readOnly}
@@ -333,7 +333,7 @@ export default function CPMForm({
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm text-gray-600 mb-1">
-                  สาเหตุของอุบัติเหตุ <span className="text-red-500">*</span>
+                  สาเหตุของอุบัติเหตุ(ไม่เกิน 250 ตัวอักษร) <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   name="cause"

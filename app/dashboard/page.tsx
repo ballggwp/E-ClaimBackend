@@ -7,7 +7,7 @@ import { useEffect, useState, useMemo, ReactNode } from "react";
 import Link from "next/link";
 import { ClaimTimelineWithDates } from "@/components/ClaimTimeline";
 import React from "react";
-import { format, differenceInCalendarDays } from "date-fns";
+import { format, differenceInCalendarDays, parseISO } from "date-fns";
 interface ClaimSummary {
   statusDates: Record<string, string>;
   createdById: string;
@@ -287,10 +287,7 @@ function Section({
       <div className="space-y-6">
         {claims.map((c) => {
           // compute days passed
-          const daysPassed = differenceInCalendarDays(
-            new Date(),
-            new Date(c.createdAt)
-          );
+          
           // compute next status label
           const STEPS = [
             "SUBMITTED",
@@ -309,7 +306,33 @@ function Section({
                   .map((w) => w[0] + w.slice(1).toLowerCase())
                   .join(" ")
               : "—";
+          const currIdx = STEPS.indexOf(c.status);
 
+// 3) helper to safely read from your statusDates map:
+const getDate = (code: string) => {
+  const iso = c.statusDates[code];
+  return iso ? parseISO(iso) : null;
+};
+
+let daysPassed = 0;
+if (c.status === "COMPLETED") {
+  // completed: days between when you submitted and when you completed
+  const submitted = parseISO(c.submittedAt);
+  const done      = getDate("COMPLETED");
+  if (submitted && done) {
+    daysPassed = differenceInCalendarDays(done, submitted);
+  }
+} else if (currIdx > 0) {
+  // in‐flight: days between previous step and this step
+  const prevDate = getDate(STEPS[currIdx - 1]);
+  const currDate = getDate(c.status);
+  if (prevDate && currDate) {
+    daysPassed = differenceInCalendarDays(currDate, prevDate);
+  }
+} else {
+  // still in DRAFT: days since creation
+  daysPassed = differenceInCalendarDays(new Date(), new Date(c.createdAt));
+}
           return (
             <div
               key={c.id}

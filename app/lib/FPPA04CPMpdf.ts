@@ -39,7 +39,7 @@ const fmtDate = (iso: string) =>
 
 export function createFPPA04CPMPDF(data: Fppa04CPMData) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-
+  console.log(data.datePendingManager)
   // embed fonts
   doc.addFileToVFS("THSarabunNew.ttf", fontBase64);
   doc.addFont("THSarabunNew.ttf", "THSarabunNew", "normal");
@@ -51,9 +51,18 @@ export function createFPPA04CPMPDF(data: Fppa04CPMData) {
   doc.text("รายงานสรุปรายการรับเงินค่าสินไหมทดแทน", 105, 15, { align: "center" });
 
   // Thai date formatter (Buddhist Era)
-  const fmtDate = (iso: string) =>
-    new Date(iso).toLocaleDateString("th-TH-u-ca-buddhist", { day: "2-digit", month: "short", year: "numeric" });
-
+  function fmtBE(iso?: string) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const dd     = String(d.getDate()).padStart(2, '0');
+  const mm     = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyyBE = d.getFullYear() + 543;
+  return `${dd}/${mm}/${yyyyBE}`;
+}
+const pendingMgr = fmtBE(data.datePendingManager);
+const checker    = fmtBE(data.dateCompleted);
+const signer     = fmtBE(data.dateCompleted);
   // Header row above main table
   autoTable(doc, {
     startY: 20,
@@ -252,9 +261,9 @@ const names = [
   data.signerName.replace(/^(นาย|นางสาว|นาง)\s*/, '')
 ];
 const labels = [
-  fmtDate(data.datePendingManager),
-  fmtDate(data.dateCompleted),         // for “ผู้ตรวจสอบ”
-  fmtDate(data.dateCompleted),         // for “ผู้เซ็น” (same as completed)
+  pendingMgr,
+  checker,         // for “ผู้ตรวจสอบ”
+  signer,         // for “ผู้เซ็น” (same as completed)
 ];
 
 for (let i = 0; i < 3; i++) {

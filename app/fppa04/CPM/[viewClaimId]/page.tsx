@@ -1,11 +1,13 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { ChangeEvent, useEffect, useState } from "react";
+import { ChangeEvent, JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal, useEffect, useState } from "react";
 import Swal from "sweetalert2";
 import FPPA04Form, { FPPA04CPMFormValues } from "@/components/FPPA04CPM";
-import { CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, FileText, XCircle } from "lucide-react";
 import Link from "next/link";
+import { createCPMFormPDF } from "@/app/lib/CPMpdf";
+import { createFPPA04CPMPDF, type Fppa04CPMData } from '@/app/lib/FPPA04CPMpdf';
 
 interface ViewDefaults {
   signerName:string;
@@ -14,18 +16,61 @@ interface ViewDefaults {
   approverName: string;
   status: string;
 }
-
+interface ClaimMeta {
+  approverDepartment:string;
+  createdAt: string;
+  signerPosition: string;
+  phoneNum: string;
+  position: string;
+  department: string;
+  docNum: string;
+  approverName: string;
+  approverPosition: string;
+  signerName: string;
+  createdByName: string;
+  accidentDate: string;
+  accidentTime: string;
+  location: string;
+  cause: string;
+  repairShop?: string;
+  repairShopLocation?: string;
+  policeDate?: string;
+  policeTime?: string;
+  policeStation?: string;
+  damageOwnType: string;
+  damageOtherOwn?: string;
+  damageDetail?: string;
+  damageAmount?: number;
+  victimDetail?: string;
+  partnerName?: string;
+  partnerPhone?: string;
+  partnerLocation?: string;
+  partnerDamageDetail?: string;
+  partnerDamageAmount?: number;
+  partnerVictimDetail?: string;
+  datePendingManager: string;   // ISO when status went to PENDING_MANAGER_REVIEW
+  dateCompleted:      string; 
+}
+interface AttachmentItem {
+  id: string;
+  fileName: string;
+  url: string;
+  type: string;
+}
 export default function ViewCPMPage() {
   const { viewClaimId } = useParams();
   const { data: session, status } = useSession();
   const router = useRouter();
-
+  const [claim, setClaim] = useState<ClaimMeta | null>(null);
   const [defaults, setDefaults] = useState<ViewDefaults | null>(null);
   const [initial, setInitial] = useState<FPPA04CPMFormValues | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [userFiles, setUserFiles] = useState<File[]>([]);
   const [modalImage, setModalImage] = useState<string | null>(null); // For image inspection
-
+  const [fppa04Data, setFppa04Data] = useState<Fppa04CPMData | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+   const [attachments, setAttachments] = useState<AttachmentItem[]>([]); 
+  const [previewType, setPreviewType] = useState<'cpm' | 'fppa04' | null>(null);
   // Handle file uploads
   const handleUserFiles = (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -45,63 +90,156 @@ export default function ViewCPMPage() {
   const closeImageModal = () => setModalImage(null);
 
   useEffect(() => {
-    if (status !== "authenticated") return;
-
+    if (status !== 'authenticated') return;
     (async () => {
       try {
-        const res = await fetch(
+        // 1) Fetch CPM metadata + form
+        const res1 = await fetch(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/claims/${viewClaimId}`,
+          { headers: { Authorization: `Bearer ${session!.user.accessToken}` } }
+        );
+        if (!res1.ok) throw new Error('ไม่พบข้อมูลฟอร์ม');
+        const { claim: raw } = await res1.json();
+        const dates = raw.statusDates ?? {};
+        const form = raw.cpmForm;
+
+        // Flatten
+        const flat: ClaimMeta = {
+          approverDepartment: raw.approverDepartment,
+          createdAt: raw.createdAt,
+          signerPosition: raw.signerPosition,
+          phoneNum: form.phoneNum ?? '',
+          department: session!.user.department,
+          position: raw.position ?? raw.signerPosition,
+          docNum: raw.docNum,
+          approverName: raw.approverName,
+          approverPosition: raw.approverPosition,
+          signerName: raw.signerName ?? '',
+          createdByName: raw.createdByName,
+          accidentDate: form.accidentDate?.split('T')[0] ?? '',
+          accidentTime: form.accidentTime ?? '',
+          location: form.location ?? '',
+          cause: form.cause ?? '',
+          repairShop: form.repairShop ?? '',
+          repairShopLocation: form.repairShopLocation ?? '',
+          policeDate: form.policeDate?.split('T')[0] ?? '',
+          policeTime: form.policeTime ?? '',
+          policeStation: form.policeStation ?? '',
+          damageOwnType: form.damageOwnType ?? '',
+          damageOtherOwn: form.damageOtherOwn ?? '',
+          damageDetail: form.damageDetail ?? '',
+          damageAmount: form.damageAmount ?? 0,
+          victimDetail: form.victimDetail ?? '',
+          partnerName: form.partnerName ?? '',
+          partnerPhone: form.partnerPhone ?? '',
+          partnerLocation: form.partnerLocation ?? '',
+          partnerDamageDetail: form.partnerDamageDetail ?? '',
+          partnerDamageAmount: form.partnerDamageAmount ?? 0,
+          partnerVictimDetail: form.partnerVictimDetail ?? '',
+          datePendingManager: dates['PENDING_MANAGER_REVIEW'] ?? '',
+          dateCompleted: dates['COMPLETED'] ?? ''
+        };
+
+        setClaim(flat);
+        setDefaults({
+          signerName: flat.signerName,
+          docNum: flat.docNum,
+          cause: flat.cause,
+          approverName: flat.approverName,
+          status: raw.status
+        });
+        const attRes = await fetch(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/claims/${viewClaimId}/attachments`,
+          { headers: { Authorization: `Bearer ${session!.user.accessToken}` } }
+        );
+        if (attRes.ok) {
+          const attJson = await attRes.json();
+          setAttachments(Array.isArray(attJson) ? attJson : attJson.attachments || []);
+        }
+
+
+        // 2) Fetch FPPA04 form
+        const res2 = await fetch(
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/fppa04/${viewClaimId}`,
           { headers: { Authorization: `Bearer ${session!.user.accessToken}` } }
         );
-        if (!res.ok) throw new Error(await res.text());
-        const { form, claim } = await res.json();
-        setDefaults({
-          signerName:claim.signerName,
-          docNum: claim.docNum,
-          cause: claim.cpmForm.cause,
-          approverName: claim.approverName,
-          status: claim.status,
+        if (!res2.ok) throw new Error(await res2.text());
+        const { form: fppaForm } = await res2.json();
+        setFppa04Data(fppaForm);
+
+        setInitial({
+          eventType: fppaForm.eventType,
+          claimRefNumber: fppaForm.claimRefNumber,
+          eventDescription: fppaForm.eventDescription,
+          productionYear: fppaForm.productionYear.toString(),
+          accidentDate: fppaForm.accidentDate.slice(0,10),
+          reportedDate: fppaForm.reportedDate.slice(0,10),
+          receivedDocDate: fppaForm.receivedDocDate.slice(0,10),
+          company: fppaForm.company,
+          factory: fppaForm.factory,
+          policyNumber: fppaForm.policyNumber,
+          surveyorRefNumber: fppaForm.surveyorRefNumber,
+          items: fppaForm.items.map((i: { category: any; description: any; total: { toString: () => any; }; exception: { toString: () => any; }; }) => ({
+            category: i.category,
+            description: i.description,
+            total: i.total.toString(),
+            exception: i.exception.toString()
+          })),
+          adjustments: fppaForm.adjustments.map((a: { type: any; description: any; amount: { toString: () => any; }; }) => ({
+            type: a.type,
+            description: a.description,
+            amount: a.amount.toString()
+          })),
+          signatureFiles: [],
+          signatureUrls: fppaForm.signatureFiles,
+          insurancePayout: fppaForm.insurancePayout
         });
 
-        if (form) {
-          setInitial({
-            eventType: form.eventType,
-            claimRefNumber: form.claimRefNumber,
-            eventDescription: form.eventDescription,
-            productionYear: form.productionYear.toString(),
-            accidentDate: form.accidentDate.slice(0, 10),
-            reportedDate: form.reportedDate.slice(0, 10),
-            receivedDocDate: form.receivedDocDate.slice(0, 10),
-            company: form.company,
-            factory: form.factory,
-            policyNumber: form.policyNumber,
-            surveyorRefNumber: form.surveyorRefNumber,
-            items: form.items.map((i: any) => ({
-              category: i.category,
-              description: i.description,
-              total: i.total.toString(),
-              exception: i.exception.toString(),
-            })),
-            adjustments: form.adjustments.map((a: any) => ({
-              type: a.type,
-              description: a.description,
-              amount: a.amount.toString(),
-            })),
-            signatureFiles: [],
-            signatureUrls: form.signatureFiles,
-            insurancePayout: form.insurancePayout,
-          });
-        }
       } catch (e: any) {
         setError(e.message);
       }
     })();
   }, [status, viewClaimId, session]);
+const handlePreview = (type:'cpm'|'fppa04') => {
+    if (type === 'cpm' && claim) {
+      const blob = createCPMFormPDF(claim).output('blob') as Blob;
+      previewUrl && URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(URL.createObjectURL(blob));
+      setPreviewType('cpm');
+    }
+    if (type === 'fppa04' && fppa04Data && claim) {
+      const blob = createFPPA04CPMPDF({
+  // spread your FPA04 form data
+  ...fppa04Data!,
+  // pull approverName from the CPM claim state
+  approverName: claim!.approverName,
+  signerName:claim!.signerName,
+  signerPosition:claim!.signerPosition,
+   datePendingManager: claim.datePendingManager,
+      dateCompleted:      claim.dateCompleted,
+}).output("blob") as Blob;
+      previewUrl && URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(URL.createObjectURL(blob));
+      setPreviewType('fppa04');
+    }
+  };
 
+  const handleDownload = (type:'cpm'|'fppa04') => {
+    if (type === 'cpm' && claim) createCPMFormPDF(claim).save(`CPM-${claim.docNum}.pdf`);
+    if (type === 'fppa04' && fppa04Data && claim) createFPPA04CPMPDF({
+  ...fppa04Data!,
+  approverName: claim!.approverName,
+  signerName:claim!.signerName,
+  signerPosition:claim!.signerPosition,
+   datePendingManager: claim.datePendingManager,
+      dateCompleted:      claim.dateCompleted,
+}).save(`FPA04-CPM-${claim!.docNum}.pdf`);
+  };
   if (!defaults || !initial) {
     return <div className="p-6">{error ? `Error: ${error}` : "Loading…"}</div>;
   }
-
+  
+const userConfirmDocs = attachments.filter((a: { type: string; }) => a.type === 'USER_CONFIRM_DOC');
   return (
     <div className="min-h-screen bg-white-100 py-8 px-4">
       <div className="max-w-5xl mx-auto">
@@ -123,7 +261,53 @@ export default function ViewCPMPage() {
           initialData={initial}
           onSave={() => {}}
         />
-        <div>
+        {/* Preview / Download buttons */}
+        
+      {/* Download Section */}
+        {(defaults.status === 'PENDING_USER_CONFIRM' || defaults.status === 'COMPLETED') && (
+          <>
+            <label className="block text-sm font-medium text-gray-700 my-2">กรุณาเซ็นเอกสารนี้ส่งมาที่ประกัน</label>
+            <div className="flex space-x-4 mb-8">
+              <button onClick={() => handleDownload('cpm')} disabled={!claim} className="px-6 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+                📄 ดาวน์โหลด CPM
+              </button>
+              <button onClick={() => handleDownload('fppa04')} disabled={!claim || !fppa04Data} className="px-6 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">
+                📄 ดาวน์โหลด ฟปภ04
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Preview Iframe */}
+        {previewUrl && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-2">{previewType === 'cpm' ? 'ตัวอย่าง CPM' : 'ตัวอย่าง FPA04-CPM'}</h2>
+            <iframe src={previewUrl} width="100%" height={600} className="border" />
+            <button onClick={() => { URL.revokeObjectURL(previewUrl); setPreviewUrl(null); setPreviewType(null); }} className="mt-2 text-sm text-gray-600 hover:underline">ปิดตัวอย่าง</button>
+          </div>
+        )}
+
+        {/* User-confirm docs (completed) */}
+        {defaults.status === 'COMPLETED' && userConfirmDocs.length > 0 && (
+          <section className="mb-8">
+            <h2 className="text-lg font-semibold mb-2">เอกสารที่คุณส่งมาแล้ว</h2>
+            <div className="grid grid-cols-4 gap-4 mt-4">
+              {userConfirmDocs.map(att => {
+                const isImage = /\.(jpe?g|png|gif|bmp)$/i.test(att.fileName);
+                return (
+                  <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer" className="border rounded-lg p-2 bg-white flex flex-col items-center hover:bg-gray-50">
+                    {isImage ? (
+                      <img src={att.url} className="h-24 object-contain mb-2 cursor-pointer" onClick={e => { e.preventDefault(); openImageModal(att.url); }} />
+                    ) : (
+                      <div className="h-24 w-full flex items-center justify-center text-4xl">📄</div>
+                    )}
+                    <p className="text-xs text-gray-700 truncate w-full text-center">{att.fileName}</p>
+                  </a>
+                );
+              })}
+            </div>
+          </section>
+        )}
           {/* Manager Approval */}
           {defaults.status === "PENDING_MANAGER_REVIEW" &&
             session?.user.role === "MANAGER" && (
@@ -194,6 +378,7 @@ export default function ViewCPMPage() {
               </div>
             )}
         </div>
+        
         {/* User File Upload Section */}
         <div className="mt-6 space-y-4">
           {defaults.status === "PENDING_USER_CONFIRM" && session?.user.role === "USER" && (
@@ -213,6 +398,7 @@ export default function ViewCPMPage() {
              file:bg-blue-50 file:text-blue-700
              hover:file:bg-blue-100"
           />
+           
 
           {/* File Preview */}
           {userFiles.length > 0 && (
@@ -255,6 +441,7 @@ export default function ViewCPMPage() {
               })}
             </div>
           )}
+          
 
           {/* Submit buttons */}
           <div className="flex justify-center space-x-4 mt-6">
@@ -333,12 +520,11 @@ export default function ViewCPMPage() {
               ปฏิเสธ
             </button>
           </div>
+          
         </div>
+        
       )}
-
-      
-
-
+        
       {/* Image Modal for Inspection */}
       {modalImage && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
@@ -350,7 +536,6 @@ export default function ViewCPMPage() {
           </div>
         </div>
       )}
-    </div>
     </div>
     </div>
   );

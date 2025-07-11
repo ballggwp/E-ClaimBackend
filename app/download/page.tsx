@@ -57,7 +57,7 @@ export default function DownloadSelectPage() {
         categorySub:  subCat,
         excludeStatus:"DRAFT",
       };
-      if (session!.user.role !== "INSURER") {
+      if (session!.user.role !== "INSURANCE") {
         params.userEmail = session!.user.email!;
       }
       const qs = new URLSearchParams(params).toString();
