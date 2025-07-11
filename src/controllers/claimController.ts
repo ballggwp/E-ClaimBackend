@@ -764,4 +764,38 @@ export const listAttachments: RequestHandler = async (req, res, next) => {
     res.status(500).json({ message: "ไม่สามารถโหลดไฟล์ได้" });
   }
 };
+export const uploadAttachments: RequestHandler = async (req, res, next): Promise<void> => {
+  try {
+    const claimId = req.params.id;
+    const files = (req.files as Express.Multer.File[]) || [];
 
+    if (!files.length) {
+      res.status(400).json({ message: "No files uploaded" });
+      return;  // <-- early exit with void
+    }
+
+    const now = Date.now();
+    const creates = files.map((f, idx) => ({
+      id:       `${claimId}-${now}-${idx}`,
+      claimId,
+      type:     AttachmentType.INSURANCE_DOC,
+      fileName: f.originalname,
+      url:      saveFile(f),
+      uploadedAt: new Date(),
+    }));
+
+    await prisma.attachment.createMany({ data: creates });
+
+    const newAttachments = await prisma.attachment.findMany({
+      where: { claimId },
+      orderBy: { uploadedAt: "asc" },
+    });
+
+    // **DO NOT return this**—just call it, then end the function
+    res.json(newAttachments);
+    // function returns void here
+  } catch (err) {
+    console.error("uploadAttachments error:", err);
+    next(err);
+  }
+};

@@ -25,6 +25,7 @@ enum AttachmentType {
   ESTIMATE_DOC
   OTHER_DOCUMENT
   USER_CONFIRM_DOC
+  INSURANCE_DOC
 }
 
 enum Role {

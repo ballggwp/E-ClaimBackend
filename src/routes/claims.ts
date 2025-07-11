@@ -3,7 +3,7 @@ import express from "express";
 import multer from "multer";
 import * as claimCtl from "../controllers/claimController";
 import { ensureAuth, ensureRole } from "../middleware/authMiddleware";
-import { updateSigner } from "../controllers/claimController";
+import { updateSigner,uploadAttachments } from "../controllers/claimController";
 const router = express.Router();
 const upload = multer({ dest: "uploads/" });
 // List & filter claims
@@ -95,5 +95,5 @@ router.put(
    claimCtl.getClaim
  );
 router.get("/:id/attachments", ensureAuth, claimCtl.listAttachments);
-
+router.post ("/:id/attachments", upload.array("attachments"), uploadAttachments);
 export default router;
