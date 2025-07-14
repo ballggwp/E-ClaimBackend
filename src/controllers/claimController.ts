@@ -542,28 +542,29 @@ const dateStamp = format(now, "yyyyMMddHHmmss");
 
     // inside createCpmForm, after you've saved the CPM form...
 const attachCreates = [
-  // damageImages
-  ...damageFiles.map((f) => ({
+  // DAMAGE_IMAGE
+  ...damageFiles.map(f => ({
     id:       `${claimId}-${dateStamp}-D${Math.random().toString(36).slice(2,6)}`,
     claimId,
-    type: "DAMAGE_IMAGE" as const,
-    fileName: f.originalname,    // ← use originalname
+    type:     "DAMAGE_IMAGE" as const,
+    // reinterpret the raw JS string (which was decoded as latin1) as UTF-8
+    fileName: Buffer.from(f.originalname, "latin1").toString("utf8"),
     url:      saveFile(f),
   })),
-  // estimateDocs
-  ...estimateFiles.map((f) => ({
-    id:       `${claimId}-${dateStamp}-D${Math.random().toString(36).slice(2,6)}`,
+  // ESTIMATE_DOC
+  ...estimateFiles.map(f => ({
+    id:       `${claimId}-${dateStamp}-E${Math.random().toString(36).slice(2,6)}`,
     claimId,
-    type: "ESTIMATE_DOC" as const,
-    fileName: f.originalname,    // ← use originalname
+    type:     "ESTIMATE_DOC" as const,
+    fileName: Buffer.from(f.originalname, "latin1").toString("utf8"),
     url:      saveFile(f),
   })),
-  // otherDocuments
-  ...otherFiles.map((f) => ({
-    id:       `${claimId}-${dateStamp}-D${Math.random().toString(36).slice(2,6)}`,
+  // OTHER_DOCUMENT
+  ...otherFiles.map(f => ({
+    id:       `${claimId}-${dateStamp}-O${Math.random().toString(36).slice(2,6)}`,
     claimId,
-    type: "OTHER_DOCUMENT" as const,
-    fileName: f.originalname,    // ← use originalname
+    type:     "OTHER_DOCUMENT" as const,
+    fileName: Buffer.from(f.originalname, "latin1").toString("utf8"),
     url:      saveFile(f),
   })),
 ];
@@ -654,31 +655,32 @@ export const updateCpmForm: RequestHandler = async (req, res, next) => {
     // 2) Prepare new attachment records
     const dateStamp = format(now, "yyyyMMddHHmmss");
     const attachCreates = [
-      // DAMAGE_IMAGE
-      ...damageFiles.map(f => ({
-        id:       `${claimId}-${dateStamp}-D${Math.random().toString(36).slice(2,6)}`,
-        claimId,
-        type:     "DAMAGE_IMAGE" as const,
-        fileName: f.originalname,
-        url:      saveFile(f),
-      })),
-      // ESTIMATE_DOC
-      ...estimateFiles.map(f => ({
-        id:       `${claimId}-${dateStamp}-E${Math.random().toString(36).slice(2,6)}`,
-        claimId,
-        type:     "ESTIMATE_DOC" as const,
-        fileName: f.originalname,
-        url:      saveFile(f),
-      })),
-      // OTHER_DOCUMENT
-      ...otherFiles.map(f => ({
-        id:       `${claimId}-${dateStamp}-O${Math.random().toString(36).slice(2,6)}`,
-        claimId,
-        type:     "OTHER_DOCUMENT" as const,
-        fileName: f.originalname,
-        url:      saveFile(f),
-      })),
-    ];
+  // DAMAGE_IMAGE
+  ...damageFiles.map(f => ({
+    id:       `${claimId}-${dateStamp}-D${Math.random().toString(36).slice(2,6)}`,
+    claimId,
+    type:     "DAMAGE_IMAGE" as const,
+    // reinterpret the raw JS string (which was decoded as latin1) as UTF-8
+    fileName: Buffer.from(f.originalname, "latin1").toString("utf8"),
+    url:      saveFile(f),
+  })),
+  // ESTIMATE_DOC
+  ...estimateFiles.map(f => ({
+    id:       `${claimId}-${dateStamp}-E${Math.random().toString(36).slice(2,6)}`,
+    claimId,
+    type:     "ESTIMATE_DOC" as const,
+    fileName: Buffer.from(f.originalname, "latin1").toString("utf8"),
+    url:      saveFile(f),
+  })),
+  // OTHER_DOCUMENT
+  ...otherFiles.map(f => ({
+    id:       `${claimId}-${dateStamp}-O${Math.random().toString(36).slice(2,6)}`,
+    claimId,
+    type:     "OTHER_DOCUMENT" as const,
+    fileName: Buffer.from(f.originalname, "latin1").toString("utf8"),
+    url:      saveFile(f),
+  })),
+];
 
     // 3) Bulk insert any new attachments
     if (attachCreates.length) {
@@ -830,7 +832,7 @@ export const userConfirm: RequestHandler = async (req, res, next) => {
       id:       `${req.params.id}-${Date.now()}-U${Math.random().toString(36).slice(2,6)}`,
       claimId:  req.params.id,
       type:     AttachmentType.USER_CONFIRM_DOC,
-      fileName: f.originalname,
+      fileName: Buffer.from(f.originalname, "latin1").toString("utf8"),
       url:      saveFile(f),
     }));
 
@@ -898,7 +900,7 @@ export const uploadAttachments: RequestHandler = async (req, res, next): Promise
       id:       `${claimId}-${now}-${idx}`,
       claimId,
       type:     AttachmentType.INSURANCE_DOC,
-      fileName: f.originalname,
+      fileName: Buffer.from(f.originalname, "latin1").toString("utf8"),
       url:      saveFile(f),
       uploadedAt: new Date(),
     }));

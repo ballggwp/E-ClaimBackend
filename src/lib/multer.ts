@@ -1,16 +1,14 @@
-import multer from "multer";
-import path from "path";
+import multer from 'multer';
+import iconv from 'iconv-lite';
 
-// Tell Multer exactly where to put incoming files, and what to name them:
 const storage = multer.diskStorage({
-  destination: './public/uploads',
+  destination: './uploads',
   filename: (req, file, cb) => {
-    const ext       = path.extname(file.originalname)                  // “.pdf”
-    const nameOnly  = path.basename(file.originalname, ext)            // “my-document”
-    const timestamp = Date.now()                                       // e.g. 1623795300000
-
-    cb(null, `${nameOnly}-${timestamp}${ext}`)
+    // reinterpret the raw originalname bytes as UTF-8
+    const utf8Name = iconv.decode(Buffer.from(file.originalname, 'binary'), 'utf8');
+    // optional: prefix with a timestamp or UUID to avoid collisions
+    cb(null, `${Date.now()}-${utf8Name}`);
   }
-})
+});
 
-export const upload = multer({ storage })
+export const upload = multer({ storage });
