@@ -1,32 +1,28 @@
 // app/download/page.tsx
 "use client";
 
-import { useState }   from "react";
-import { useRouter }  from "next/navigation";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { format }     from "date-fns";
-import { th }         from 'date-fns/locale';
+import { format } from "date-fns";
+import { th } from "date-fns/locale";
 
 interface ClaimItem {
-  id:            string;
-  docNum:        string;
-  status:        string;
+  id: string;
+  docNum: string;
+  status: string;
   createdByName: string;
-  cause:         string;
-  updatedAt:     string;
+  cause: string;
+  updatedAt: string;
 }
 
-const MAIN_CATEGORIES = [
-  "Physical Assets",
-  "Personnel",
-  "Other",
-] as const;
-type MainCategory = typeof MAIN_CATEGORIES[number];
+const MAIN_CATEGORIES = ["Physical Assets", "Personnel", "Other"] as const;
+type MainCategory = (typeof MAIN_CATEGORIES)[number];
 
 const SUB_CATEGORIES: Record<MainCategory, string[]> = {
   "Physical Assets": ["CPM", "Equipment", "Building"],
-  "Personnel":       ["Health", "Liability"],
-  "Other":           ["General", "Misc"],
+  Personnel: ["Health", "Liability"],
+  Other: ["General", "Misc"],
 };
 
 export default function DownloadSelectPage() {
@@ -34,10 +30,10 @@ export default function DownloadSelectPage() {
   const router = useRouter();
 
   const [mainCat, setMainCat] = useState<MainCategory | "">("");
-  const [subCat,  setSubCat]  = useState<string>("");
-  const [claims,  setClaims]  = useState<ClaimItem[]>([]);
+  const [subCat, setSubCat] = useState<string>("");
+  const [claims, setClaims] = useState<ClaimItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState("");
+  const [error, setError] = useState("");
 
   const handleSearch = async () => {
     if (!mainCat || !subCat) {
@@ -52,10 +48,10 @@ export default function DownloadSelectPage() {
     setLoading(true);
 
     try {
-      const params: Record<string,string> = {
+      const params: Record<string, string> = {
         categoryMain: mainCat,
-        categorySub:  subCat,
-        excludeStatus:"DRAFT",
+        categorySub: subCat,
+        excludeStatus: "DRAFT",
       };
       if (session!.user.role !== "INSURANCE") {
         params.userEmail = session!.user.email!;
@@ -66,8 +62,8 @@ export default function DownloadSelectPage() {
         { headers: { Authorization: `Bearer ${session!.user.accessToken}` } }
       );
       if (!res.ok) throw new Error(await res.text());
-      const { claims: data } = await res.json() as { claims: ClaimItem[] };
-      const filtered = data.filter(c => c.status === "COMPLETED");
+      const { claims: data } = (await res.json()) as { claims: ClaimItem[] };
+      const filtered = data.filter((c) => c.status === "COMPLETED");
       setClaims(filtered);
       if (filtered.length === 0) {
         setError("ไม่พบฟอร์มที่คุณมีสิทธิ์ดาวน์โหลด");
@@ -93,15 +89,17 @@ export default function DownloadSelectPage() {
             <label className="block mb-2 font-medium">Category Main</label>
             <select
               value={mainCat}
-              onChange={e => {
+              onChange={(e) => {
                 setMainCat(e.target.value as MainCategory);
                 setSubCat("");
               }}
               className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-300"
             >
               <option value="">-- เลือก Main --</option>
-              {MAIN_CATEGORIES.map(m => (
-                <option key={m} value={m}>{m}</option>
+              {MAIN_CATEGORIES.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
               ))}
             </select>
           </div>
@@ -110,13 +108,15 @@ export default function DownloadSelectPage() {
             <label className="block mb-2 font-medium">Sub Category</label>
             <select
               value={subCat}
-              onChange={e => setSubCat(e.target.value)}
+              onChange={(e) => setSubCat(e.target.value)}
               disabled={!mainCat}
               className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-300 disabled:opacity-50"
             >
               <option value="">-- เลือก Sub --</option>
-              {availableSubs.map(s => (
-                <option key={s} value={s}>{s}</option>
+              {availableSubs.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
               ))}
             </select>
           </div>
@@ -151,11 +151,13 @@ export default function DownloadSelectPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {claims.map(c => (
+                {claims.map((c) => (
                   <tr
                     key={c.id}
                     className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => router.push(`/download/claim/${c.id}`)}
+                    onClick={() =>
+                      router.push(`/download/claim/${subCat}/${c.id}`)
+                    }
                   >
                     <td className="px-6 py-5 text-base text-gray-800 whitespace-nowrap">
                       {c.docNum}
@@ -167,7 +169,9 @@ export default function DownloadSelectPage() {
                       {c.cause}
                     </td>
                     <td className="px-6 py-5 text-base text-gray-800 whitespace-nowrap">
-                      {format(new Date(c.updatedAt), "d MMM yyyy", { locale: th })}
+                      {format(new Date(c.updatedAt), "d MMM yyyy", {
+                        locale: th,
+                      })}
                     </td>
                   </tr>
                 ))}

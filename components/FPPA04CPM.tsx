@@ -363,59 +363,52 @@ export default function FPPA04Form({
 
       {/* Dates & Company/Factory */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-  <div>
-    <label className="block mb-1 font-medium">ปีรถที่ผลิต</label>
-    <input
-      name="productionYear"
-      type="number"
-      value={vals.productionYear}
-      onChange={handleInput}
-      disabled={!canEdit}
-      className={inputClass(canEdit)}
-    />
-  </div>
-  <div>
-    <ThaiDatePicker
-      name="accidentDate"
-      label="วันที่เกิดเหตุ"
-      value={vals.accidentDate}
-      onChange={(iso) =>
-        setVals((v) => ({ ...v, accidentDate: iso }))
-      }
-      disabled={!canEdit}
-      inputClass={inputClass(canEdit)}
-    />
-  </div>
-</div>
+        <div>
+          <label className="block mb-1 font-medium">ปีรถที่ผลิต</label>
+          <input
+            name="productionYear"
+            type="number"
+            value={vals.productionYear}
+            onChange={handleInput}
+            disabled={!canEdit}
+            className={inputClass(canEdit)}
+          />
+        </div>
+        <div>
+          <ThaiDatePicker
+            name="accidentDate"
+            label="วันที่เกิดเหตุ"
+            value={vals.accidentDate}
+            onChange={(iso) => setVals((v) => ({ ...v, accidentDate: iso }))}
+            disabled={!canEdit}
+            inputClass={inputClass(canEdit)}
+          />
+        </div>
+      </div>
 
-{/* Second row: reportedDate + receivedDocDate */}
-<div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-  <div>
-    <ThaiDatePicker
-      name="reportedDate"
-      label="วันที่รับแจ้ง"
-      value={vals.reportedDate}
-      onChange={(iso) =>
-        setVals((v) => ({ ...v, reportedDate: iso }))
-      }
-      disabled={!canEdit}
-      inputClass={inputClass(canEdit)}
-    />
-  </div>
-  <div>
-    <ThaiDatePicker
-      name="receivedDocDate"
-      label="วันที่ได้รับเอกสาร"
-      value={vals.receivedDocDate}
-      onChange={(iso) =>
-        setVals((v) => ({ ...v, receivedDocDate: iso }))
-      }
-      disabled={!canEdit}
-      inputClass={inputClass(canEdit)}
-    />
-  </div>
-</div>
-      
+      {/* Second row: reportedDate + receivedDocDate */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        <div>
+          <ThaiDatePicker
+            name="reportedDate"
+            label="วันที่รับแจ้ง"
+            value={vals.reportedDate}
+            onChange={(iso) => setVals((v) => ({ ...v, reportedDate: iso }))}
+            disabled={!canEdit}
+            inputClass={inputClass(canEdit)}
+          />
+        </div>
+        <div>
+          <ThaiDatePicker
+            name="receivedDocDate"
+            label="วันที่ได้รับเอกสาร"
+            value={vals.receivedDocDate}
+            onChange={(iso) => setVals((v) => ({ ...v, receivedDocDate: iso }))}
+            disabled={!canEdit}
+            inputClass={inputClass(canEdit)}
+          />
+        </div>
+      </div>
 
       {/* Company & Factory & Approver */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -736,7 +729,6 @@ export default function FPPA04Form({
               </div>
             );
           })}
-          
 
           {/* 2) รูปใหม่ที่เพิ่งอัปโหลด */}
           {vals.signatureFiles.map((file, idx) => {

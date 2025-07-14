@@ -43,7 +43,12 @@ export type CPMSubmitHandler = (
   files: { damageFiles: File[]; estimateFiles: File[]; otherFiles: File[] },
   saveAsDraft: boolean
 ) => void;
-
+export interface AttachmentItem {
+  id: string;
+  fileName: string;
+  url: string;
+  type: "DAMAGE_IMAGE" | "ESTIMATE_DOC" | "OTHER_DOCUMENT";
+}
 interface CPMFormProps {
   header: {
     signerEditable?: boolean;
@@ -61,6 +66,10 @@ interface CPMFormProps {
     signerPosition: string;
     signerKeyword: string;
   };
+  existingFiles?: AttachmentItem[];
+  onDeleteExisting?: (att: AttachmentItem) => void;
+  onSelectApprover: (u: User) => void;
+  onSelectSigner: (u: User) => void;
   onHeaderChange: ChangeEventHandler<HTMLInputElement>;
   onSignerChange: ChangeEventHandler<HTMLInputElement>;
   values: CPMFormValues;
@@ -93,8 +102,12 @@ export default function CPMForm({
   header,
   onSaveSigner,
   onHeaderChange,
-  values,
+  onSelectApprover,
+  onSelectSigner,
   approverList,
+  values,
+  existingFiles = [],
+  onDeleteExisting,
   onChange,
   signerList,
   onSignerChange,
@@ -118,6 +131,9 @@ export default function CPMForm({
     { key: "damageDetail", label: "รายละเอียดความเสียหาย" },
     { key: "damageAmount", label: "มูลค่าความเสียหาย" },
   ];
+  const allDamage   = [ ...existingFiles.filter(a=>a.type==='DAMAGE_IMAGE'),  ...files.damageFiles ];
+  const allEstimate = [ ...existingFiles.filter(a=>a.type==='ESTIMATE_DOC'),    ...files.estimateFiles ];
+  const allOther    = [ ...existingFiles.filter(a=>a.type==='OTHER_DOCUMENT'), ...files.otherFiles ];
 
   const handleClick = (saveAsDraft: boolean) => {
     if (!saveAsDraft) {
@@ -128,11 +144,18 @@ export default function CPMForm({
         if (!v || v.trim() === "") missing.push(label);
       });
 
-      if (!isEvidenceFlow) {
-        if (files.damageFiles.length === 0) missing.push("รูปภาพความเสียหาย");
-        if (files.estimateFiles.length === 0)
-          missing.push("เอกสารสำรวจความเสียหาย");
+     if (!isEvidenceFlow) {
+      // count both old + new
+      const existingDamage = existingFiles.filter(f => f.type === 'DAMAGE_IMAGE').length;
+      const existingEstimate = existingFiles.filter(f => f.type === 'ESTIMATE_DOC').length;
+
+      if (existingDamage + files.damageFiles.length === 0) {
+        missing.push("รูปภาพความเสียหาย");
       }
+      if (existingEstimate + files.estimateFiles.length === 0) {
+        missing.push("เอกสารสำรวจความเสียหาย");
+      }
+    }
       if (missing.length) {
         Swal.fire({
           icon: "warning",
@@ -149,7 +172,6 @@ export default function CPMForm({
     `w-full border border-gray-300 px-4 py-2 rounded-lg shadow-sm 
    focus:ring-2 focus:ring-blue-400 transition
    ${readOnly ? "bg-gray-100 text-gray-600" : "bg-white text-gray-800"}`;
-  console.log(approverList);
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -197,93 +219,115 @@ export default function CPMForm({
               />
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
-    {/* Approver */}
-    <div>
-      <label className="block text-sm font-medium text-gray-600 mb-1">
-        ผู้รายงาน (EMAIL) <span className="text-red-500">*</span>
-      </label>
-      <input
-        disabled={readOnly}
-        name="approverKeyword"
-        type="text"
-        list="approverList"
-        value={header.approverKeyword}
-        onChange={onHeaderChange}
-        placeholder="พิมพ์ชื่อหรืออีเมล 3+ ตัว"
-        className={inputClass(readOnly)}
-      />
-      {approverList.length > 0 && !readOnly && (
-        <datalist id="approverList">
-          {approverList.flatMap((u) => [
-            <option key={`${u.id}-n`} value={u.employeeName.th || u.employeeName.en} />,
-            <option key={`${u.id}-e`} value={u.email} />,
-          ])}
-        </datalist>
-      )}
-      {header.approverName && (
-        <p className="mt-1 text-sm text-gray-500">
-          approver {header.approverName} ({header.approverPosition})
-        </p>
-      )}
-    </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            <div className="relative mb-4">
+              <label className="block text-sm font-medium text-gray-600 mb-1">
+                ผู้รายงาน (EMAIL) <span className="text-red-500">*</span>
+              </label>
+              <input
+                name="approverKeyword"
+                type="text"
+                value={header.approverKeyword}
+                onChange={onHeaderChange}
+                placeholder="พิมพ์ชื่อหรืออีเมล"
+                autoComplete="off"
+                className={inputClass(readOnly)}
+                disabled={readOnly}
+              />
 
-    {/* Signer (เอาทุกอย่างไว้ใน div เดียว) */}
-    <div className="flex flex-col">
-      <label className="block text-sm font-medium text-gray-600 mb-1">
-        ผู้เซ็นอนุมัติเอกสาร (EMAIL) <span className="text-red-500">*</span>
-      </label>
-      <input
-        name="signerKeyword"
-        type="text"
-        list="signerList"
-        value={header.signerKeyword}
-        onChange={onSignerChange}
-        disabled={readOnly && !signerEditable}
-        placeholder="พิมพ์ชื่อหรืออีเมล 3+ ตัว"
-        className={inputClass(readOnly && !signerEditable)}
-      />
+              {/* dropdown */}
+              {/* Approver dropdown */}
+              {!readOnly && approverList.length > 0 && (
+                <ul
+                  className="
+    absolute top-full left-0 right-0 mt-1
+    bg-white border border-gray-300 rounded shadow-lg z-50
+    max-h-48 overflow-y-auto
+  "
+                >
+                  {approverList.map((u) => (
+                    <li
+                      key={u.id}
+                      onClick={() => onSelectApprover(u)}
+                      className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                    >
+                      {u.employeeName.th || u.employeeName.en} ({u.email})
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {header.approverName && (
+                <p className="mt-1 text-sm text-gray-500">
+                  Selected: {header.approverName} ({header.approverPosition})
+                </p>
+              )}
+            </div>
 
-      {/* datalist ให้อยู่ข้างใน */}
-      {!(readOnly && !signerEditable) && signerList.length > 0 && (
-        <datalist id="signerList">
-          {signerList.flatMap((u) => [
-            <option key={`${u.id}-n`} value={u.employeeName.th ?? u.employeeName.en} />,
-            <option key={`${u.id}-e`} value={u.email} />,
-          ])}
-        </datalist>
-      )}
+            {/* Signer (เอาทุกอย่างไว้ใน div เดียว) */}
+            <div className="relative mb-4">
+              <label className="block text-sm font-medium text-gray-600 mb-1">
+                ผู้เซ็นอนุมัติเอกสาร (EMAIL){" "}
+                <span className="text-red-500">*</span>
+              </label>
+              <input
+                name="signerKeyword"
+                type="text"
+                value={header.signerKeyword}
+                onChange={onSignerChange}
+                placeholder="พิมพ์ชื่อหรืออีเมล"
+                autoComplete="off"
+                className={inputClass(readOnly && !signerEditable)}
+                disabled={readOnly && !signerEditable}
+              />
 
-      {/* ชื่อ signer */}
-      {header.signerName && (
-        <p className="mt-1 text-sm text-gray-500">
-          Signer: {header.signerName} ({header.signerPosition})
-        </p>
-      )}
-      {/* ปุ่ม Save */}
-      {signerEditable && onSaveSigner && (
-        <button
-          type="button"
-          onClick={onSaveSigner}
-          className="ml-2 mt-1 bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1 rounded"
-        >
-          Save signer
-        </button>
-      )}
-    </div>
-  </div>
+              {!readOnly && signerList.length > 0 && (
+                <ul
+                  className="
+    absolute top-full left-0 right-0 mt-1
+    bg-white border border-gray-300 rounded shadow-lg z-50
+    max-h-48 overflow-y-auto
+  "
+                >
+                  {signerList.map((u: User) => (
+                    <li
+                      key={u.id}
+                      onClick={() => onSelectSigner(u)}
+                      className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                    >
+                      {u.employeeName.th || u.employeeName.en} ({u.email})
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {header.signerName && (
+                <p className="mt-1 text-sm text-gray-500">
+                  Selected: {header.signerName} ({header.signerPosition})
+                </p>
+              )}
+
+              {signerEditable && onSaveSigner && (
+                <button
+                  type="button"
+                  onClick={onSaveSigner}
+                  className="ml-2 mt-1 bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1 rounded"
+                >
+                  Save signer
+                </button>
+              )}
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm text-gray-600 mb-1">
-                  หมายเลขติดต่อ <span className="text-red-500">*</span>
-                </label>
-                <input
-                  name="phoneNum"
-                  value={values.phoneNum || ""}
-                  onChange={onChange}
-                  disabled={readOnly}
-                  className={inputClass(readOnly)}
-                />
+                หมายเลขติดต่อ <span className="text-red-500">*</span>
+              </label>
+              <input
+                name="phoneNum"
+                value={values.phoneNum || ""}
+                onChange={onChange}
+                disabled={readOnly}
+                className={inputClass(readOnly)}
+              />
             </div>
           </div>
           {/* 1. Accident Details */}
@@ -293,17 +337,19 @@ export default function CPMForm({
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                 <ThaiDatePicker
-    name="accidentDate"
-    label="วันที่เกิดเหตุ"
-    value={values.accidentDate}
-    onChange={(iso) =>
-      // wrap into a fake ChangeEvent so your existing onChange handler still works
-      onChange({ target: { name: "accidentDate", value: iso } } as any)
-    }
-    disabled={readOnly}
-    inputClass={inputClass(readOnly)}
-  />
+                <ThaiDatePicker
+                  name="accidentDate"
+                  label="วันที่เกิดเหตุ"
+                  value={values.accidentDate}
+                  onChange={(iso) =>
+                    // wrap into a fake ChangeEvent so your existing onChange handler still works
+                    onChange({
+                      target: { name: "accidentDate", value: iso },
+                    } as any)
+                  }
+                  disabled={readOnly}
+                  inputClass={inputClass(readOnly)}
+                />
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">
@@ -333,7 +379,8 @@ export default function CPMForm({
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm text-gray-600 mb-1">
-                  สาเหตุของอุบัติเหตุ(ไม่เกิน 250 ตัวอักษร) <span className="text-red-500">*</span>
+                  สาเหตุของอุบัติเหตุ(ไม่เกิน 250 ตัวอักษร){" "}
+                  <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   name="cause"
@@ -354,15 +401,17 @@ export default function CPMForm({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <ThaiDatePicker
-    name="policeDate"
-    label="วันที่แจ้ง"
-    value={values.policeDate}
-    onChange={(iso) =>
-      onChange({ target: { name: "policeDate", value: iso } } as any)
-    }
-    disabled={readOnly}
-    inputClass={inputClass(readOnly)}
-  />
+                  name="policeDate"
+                  label="วันที่แจ้ง"
+                  value={values.policeDate}
+                  onChange={(iso) =>
+                    onChange({
+                      target: { name: "policeDate", value: iso },
+                    } as any)
+                  }
+                  disabled={readOnly}
+                  inputClass={inputClass(readOnly)}
+                />
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">เวลา</label>
@@ -585,53 +634,71 @@ export default function CPMForm({
             </div>
           </section>
 
-          {/* Attachments */}
           {!readOnly && (
-            <section className="bg-blue-50 border border-gray-200 rounded-lg p-6 space-y-6">
-              <h2 className="text-lg font-semibold text-gray-700 mb-4">
-                แนบเอกสารตามรายการ
-              </h2>
+  <section className="bg-blue-50 border border-gray-200 rounded-lg p-6 space-y-6">
+    <h2 className="text-lg font-semibold text-gray-700 mb-4">
+      แนบเอกสารตามรายการ
+    </h2>
 
-              {(["damageFiles", "estimateFiles", "otherFiles"] as const).map(
-                (field, idx) => {
-                  const label =
-                    field === "damageFiles"
-                      ? "1) รูปภาพความเสียหาย"
-                      : field === "estimateFiles"
-                      ? "2) เอกสารสำรวจความเสียหาย"
-                      : "3) เอกสารเพิ่มเติมอื่น ๆ";
+    {(["damageFiles", "estimateFiles", "otherFiles"] as const).map((field, idx) => {
+      const label = field === "damageFiles"
+        ? "1) รูปภาพความเสียหาย"
+        : field === "estimateFiles"
+          ? "2) เอกสารสำรวจความเสียหาย"
+          : "3) เอกสารเพิ่มเติมอื่น ๆ";
 
-                  return (
-                    <div key={field}>
-                      <label className="block mb-2 font-medium text-gray-700">
-                        {label}{" "}
-                        {idx < 2 && <span className="text-red-500">*</span>}
-                      </label>
+      // แยก existing กับ ใหม่
+     const typeMap: Record<
+  'damageFiles' | 'estimateFiles' | 'otherFiles',
+  AttachmentItem['type']
+> = {
+  damageFiles:   'DAMAGE_IMAGE',
+  estimateFiles: 'ESTIMATE_DOC',
+  otherFiles:    'OTHER_DOCUMENT',
+};
 
-                      <label
-                        htmlFor={field}
-                        className="group flex flex-col items-center justify-center border-2 border-dashed border-gray-300 hover:border-blue-500 bg-white p-6 rounded-xl shadow-sm cursor-pointer transition-all"
-                      >
-                        <svg
-                          className="w-8 h-8 text-gray-400 group-hover:text-blue-500"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path d="M12 4v16m8-8H4" strokeWidth={2} />
-                        </svg>
-                        <span className="mt-2 text-gray-600 group-hover:text-blue-600 text-sm">
-                          คลิกหรือวางไฟล์ที่นี่
-                        </span>
-                        <input
-                          id={field}
-                          type="file"
-                          accept=".jpg,.jpeg,.png,.pdf,.xlsx"
-                          multiple
-                          onChange={(e) => onFileChange(e, field)}
-                          className="hidden"
-                        />
-                      </label>
+// … then inside your .map((field, idx) => { …
+const attachmentType = typeMap[field];
+const exist          = existingFiles.filter(f => f.type === attachmentType);
+const added          = files[field];
+
+      return (
+        <div key={field}>
+          <label className="block mb-2 font-medium text-gray-700">
+            {label} {idx < 2 && <span className="text-red-500">*</span>}
+          </label>
+
+          {/* แสดงไฟล์เดิม */}
+          {exist.length > 0 && (
+            <ul className="mb-2">
+              {exist.map(f => (
+                <li key={f.id} className="flex items-center space-x-2 text-sm text-gray-700">
+                  <a href={f.url} target="_blank" rel="noopener noreferrer" className="underline">
+                    {f.fileName}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/* input ใหม่ */}
+          <label
+            htmlFor={field}
+            className="group flex flex-col items-center justify-center border-2 border-dashed border-gray-300 hover:border-blue-500 bg-white p-6 rounded-xl shadow-sm cursor-pointer transition-all"
+          >
+            <svg className="w-8 h-8 text-gray-400 group-hover:text-blue-500" /* … */ />
+            <span className="mt-2 text-gray-600 group-hover:text-blue-600 text-sm">
+              คลิกหรือวางไฟล์ที่นี่
+            </span>
+            <input
+              id={field}
+              type="file"
+              accept=".jpg,.jpeg,.png,.pdf,.xlsx"
+              multiple
+              onChange={(e) => onFileChange(e, field)}
+              className="hidden"
+            />
+          </label>
 
                       {files[field].length > 0 && (
                         <ul className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">

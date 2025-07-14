@@ -56,8 +56,8 @@ export function createCPMFormPDF(data: CPMFormPDFData) {
 
   // Subtitle
   doc.setFontSize(20);
-  const subtitle = `เรียน ${data.signerPosition} ผ่าน ${data.approverPosition}`;
-  doc.text(doc.splitTextToSize(subtitle, 178), 15, 35);
+  const subtitle = `เรียน รองกรรมการผู้จัดการใหญ่ กลุ่มการเงิน ผ่าน ${data.signerPosition}`;
+  doc.text(doc.splitTextToSize(subtitle, 178), 15, 30);
 
   // Starting y after header
   let y = 50;
