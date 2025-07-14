@@ -5,6 +5,7 @@ import prisma from "../lib/prisma";
 import { saveFile } from "../services/fileService";
 import { format } from "date-fns";
 import { fetchAzureToken, fetchUserInfoProfile } from "./authController";
+import axios from "axios";
 // ─── List Claims ───────────────────────────────────────────────────────────────
 // ─── List Claims ───────────────────────────────────
 export const listClaims: RequestHandler = async (req, res, next) => {
@@ -100,6 +101,7 @@ export const listClaims: RequestHandler = async (req, res, next) => {
 export const createClaim: RequestHandler = async (req, res, next) => {
   try {
     const {
+      
 
       categoryMain,
       categorySub,
@@ -167,19 +169,58 @@ if (!creator) {
         submittedAt: saveAsDraft === "true" ? null : new Date(),
       },
     });
+    
     await prisma.claimHistory.create({
    data: {
      claimId: claim.id,
      status:  claim.status
    }
  })
+ if (saveAsDraft !== "true") {
+  const newClaimId = claim.id;
 
-    res.json({ claim });
+  // fetch the record you just made
+  const db = await prisma.claim.findUnique({
+    where: { id: newClaimId },
+    select: {
+      approverEmail: true,
+      approverName:  true,
+      categorySub:   true,
+    }
+  });
+  if (!db) throw new Error(`Claim ${newClaimId} not found`);
+
+  const link = `${process.env.FE_PORT}/claims/${db.categorySub?.toLocaleLowerCase}/${newClaimId}`;
+  const mailPayload = {
+    sendFrom: 'J.Waitin@mitrphol.com',
+    sendTo:   [ 'J.Waitin@mitrphol.com' ],
+    topic:    'มีเคลมที่รอคุณอนุมัติ',
+    body:     `<p>เรียน ${db.approverName}</p>
+               <p>โปรดตรวจสอบโดยกดลิงค์นี้ <a href="${link}">${link}</a></p>`
+  };
+
+  console.log('📧 Sending mail payload:', mailPayload);
+
+  // ↓ include protocol!
+  const resp = await axios.post(
+    'http://10.26.81.4/userinfo/api/v2/email',
+    mailPayload,
+    {
+      headers: {
+        Authorization: `Bearer ${await fetchAzureToken()}`,
+        'Content-Type': 'application/json',
+      }
+    }
+  );
+  console.log(`✉️  Mail API responded ${resp.status}`, resp.data);
+}
+
+    res.status(201).json({ success: true, claim });
   } catch (err) {
+    console.error('createCpmForm error:', err);
     next(err);
   }
 };
-
 
 // ─── Get Single Claim ─────────────────────────────────────────────────────────
 // src/controllers/claimController.ts
@@ -298,7 +339,48 @@ export const updateClaim: RequestHandler = async (req, res, next) => {
       data,
       include: { cpmForm: true },
     });
+    if (status === ClaimStatus.PENDING_APPROVER_REVIEW) {
+      // 1) fetch Azure AD token
+      const azureToken = await fetchAzureToken();
 
+      // 2) Look up the fresh approver info
+      const db = await prisma.claim.findUnique({
+        where: { id },
+        select: {
+          approverEmail: true,
+          approverName:  true,
+          categorySub:   true,
+        }
+      });
+      if (!db) throw new Error(`Claim ${id} not found`);
+if (!db.categorySub) throw new Error(`Claim ${id} has no subcategory`);
+
+const sub = db.categorySub.toLowerCase();
+const link = `${process.env.FE_PORT}/claims/${sub}/${id}`;
+      // 4) Compose and send the mail
+
+      const mailPayload = {
+        sendFrom: 'J.Waitin@mitrphol.com',
+        sendTo:   [ 'J.Waitin@mitrphol.com' ],
+        topic:    'มีเคลมที่รอคุณอนุมัติ',
+        body:     `<p>เรียน ${db.approverName}</p>
+                   <p>โปรดตรวจสอบโดยกดลิงค์นี้ <a href="${link}">${link}</a></p>`
+      };
+      console.log('📧 Sending mail payload:', mailPayload);
+
+      await axios.post(
+        'http://10.26.81.4/userinfo/api/v2/email',
+        mailPayload,
+        {
+          headers: {
+            Authorization: `Bearer ${azureToken}`,
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+    }
+
+    // 5) Return
     res.json({ claim: updatedClaim });
   } catch (err) {
     next(err);
@@ -607,17 +689,54 @@ export const updateCpmForm: RequestHandler = async (req, res, next) => {
   await prisma.claim.update({
     where: { id: claimId },
     data: {
-      status: ClaimStatus.PENDING_INSURER_REVIEW,
+      status: ClaimStatus.PENDING_APPROVER_REVIEW,
       submittedAt: new Date(),   // also stamp when it was actually submitted
     },
   });
-}
+  const db = await prisma.claim.findUnique({
+        where: { id: claimId },
+        select: {
+          approverEmail: true,
+          approverName:  true,
+          categorySub:   true,   // string | null
+        },
+      });
+      if (!db) throw new Error(`Claim ${claimId} not found`);
+      if (!db.categorySub) {
+        // either throw or default
+        throw new Error(`Claim ${claimId} missing subcategory`);
+      }
 
+      const sub = db.categorySub.toLowerCase();       // now guaranteed non-null
+      const link = `${process.env.FE_PORT}/claims/${sub}/${claimId}`;
+
+      const mailPayload = {
+        sendFrom: 'J.Waitin@mitrphol.com',
+        sendTo:   [ 'J.Waitin@mitrphol.com' ],
+        topic:    'มีเคลมที่รอคุณอนุมัติ',
+        body:     `<p>เรียน ${db.approverName}</p>
+                   <p>โปรดตรวจสอบโดยกดลิงค์นี้ <a href="${link}">${link}</a></p>`,
+      };
+
+      const token = await fetchAzureToken();
+      await axios.post(
+        'http://10.26.81.4/userinfo/api/v2/email',
+        mailPayload,
+        { headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
     res.json({ success: true });
   } catch (err) {
     next(err);
   }
 };
+
+  
+    
 export const approverAction: RequestHandler = async (req, res, next) => {
   try {
     const { id } = req.params

@@ -4,6 +4,8 @@ import { fetchUserInfoProfilesByKeyword } from "./authController";
 
 export const getUserInfo: RequestHandler = async (req, res, next) => {
   try {
+    
+    console.log("↗️  GET /api/userinfo?keyword=", req.query.keyword);
     const keyword = String(req.query.keyword || "");
     if (!keyword) {
       res.status(400).json({ message: "Missing keyword" });
@@ -12,7 +14,7 @@ export const getUserInfo: RequestHandler = async (req, res, next) => {
 
     // upstream returns e.g. [{ id, name, email, positionName }]
     const raw = await fetchUserInfoProfilesByKeyword(keyword);
-
+    console.log("↗️  upstream returned", raw.length, "profiles");
     // map to a flat shape for the client
     const profiles = raw.map((p: any) => ({
       department : p.department?.name.th||p.department?.name.en||p.departmentName,
@@ -24,6 +26,7 @@ export const getUserInfo: RequestHandler = async (req, res, next) => {
 
     res.json(profiles);
   } catch (err) {
+    console.error("🔥 getUserInfo error:", err);
     next(err);
   }
 };
