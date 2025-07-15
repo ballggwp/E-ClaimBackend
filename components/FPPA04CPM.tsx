@@ -570,8 +570,8 @@ export default function FPPA04Form({
       <hr className="my-6 border-t border-blue-200" />
 
       {/* ตารางรายการบวก/หัก */}
-      <div className="overflow-auto">
-        <table className="table-fixed border-collapse">
+      <div className="overflow-auto w-full">
+        <table className="table-fixed border-collapse w-full">
           <colgroup>
             <col className="w-1/6" />
             <col className="w-3/6" />
