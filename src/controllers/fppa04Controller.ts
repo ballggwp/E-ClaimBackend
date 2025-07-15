@@ -2,6 +2,8 @@
 import type { RequestHandler } from "express";
 import { Prisma, ClaimStatus, AttachmentType } from "@prisma/client";
 import prisma from "../lib/prisma";
+import axios from "axios";
+import { fetchAzureTokenEmail } from "./claimController";
 
 // ─── Create FPPA-04 Base ───────────────────────────────────────────────────────
 export const createFppa04Base: RequestHandler = async (req, res, next) => {
@@ -200,7 +202,37 @@ export const createFppa04Cpm: RequestHandler = async (req, res, next) => {
       data: { claimId, status: ClaimStatus.PENDING_MANAGER_REVIEW },
     });
     
-
+     const claim = await prisma.claim.findUnique({
+  where: { id: claimId },
+  select: { docNum: true, categorySub: true},
+});
+      const mailPayload = {
+        sendFrom: "J.Waitin@mitrphol.com",
+        sendTo: ["J.Waitin@mitrphol.com" /*manager.email*/],
+        topic: `แจ้งอนุมัติ – Claim ${claim?.docNum}`,
+        body: [
+          `<p>เรียนผู้จัดการฝ่ายประกันกลุ่ม</p>`,
+          `<p>เคลมเลขที่ <strong>${claim?.docNum}</strong> ได้รับการอนุมัติเรียบร้อยแล้ว</p>`,
+          `<p>กรุณาตรวจสอบรายละเอียดเพิ่มเติมที่ระบบ: <a href="${process.env.FE_PORT}/fppa04/CPM/${claimId}">คลิกที่นี่</a></p>`,
+        ].join("\n"),
+      };
+      try {
+        const token = await fetchAzureTokenEmail();
+        await axios.post(
+          "https://mitrservices-internal.mitrphol.com/utility/api/v2/email",
+          mailPayload,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Ocp-Apim-Subscription-Key": process.env.AZURE_SUBSCRIPTION_KEY!,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        console.log("✉️ Approval notification sent to manager:");
+      } catch (mailErr) {
+        console.error("❌ Failed to send approval email:", mailErr);
+      }
     res.json({ cpm });
   } catch (err) {
     next(err);
