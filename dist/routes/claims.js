@@ -36,28 +36,47 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+// src/routes/claims.ts
 const express_1 = __importDefault(require("express"));
+const multer_1 = __importDefault(require("multer"));
 const claimCtl = __importStar(require("../controllers/claimController"));
+const authMiddleware_1 = require("../middleware/authMiddleware");
+const claimController_1 = require("../controllers/claimController");
 const router = express_1.default.Router();
-// Public‐facing list (with optional filters)
-// GET /api/claims?userEmail=…&excludeStatus=…
-router.get("/", claimCtl.listClaims);
-// Create a new claim (header only)
-// POST /api/claims
-router.post("/", claimCtl.createClaim);
-// Get one claim (with attachments, form, FPPA variants…)
-// GET /api/claims/:id
-router.get("/:id", claimCtl.getClaim);
-// Update claim header & nested CPM cause
-// PATCH /api/claims/:id
-router.patch("/:id", claimCtl.updateClaim);
-// Insurance‐side actions (approve, reject, evidence)
-// POST /api/claims/:id/action
-router.post("/:id/action", claimCtl.claimAction);
-// Manager‐side actions (approve/reject)
-// POST /api/claims/:id/manager
-router.post("/:id/manager", claimCtl.ManagerAction);
-// Create CPM form (one‐to‐one)
-// POST /api/claims/:claimId/cpm
-router.post("/:claimId/cpm", claimCtl.createCpmForm);
+const upload = (0, multer_1.default)({ dest: "uploads/" });
+// List & filter claims
+router.get("/", authMiddleware_1.ensureAuth, claimCtl.listClaims);
+// Create a new claim — now req.user is guaranteed
+router.post("/", authMiddleware_1.ensureAuth, claimCtl.createClaim);
+// Get one claim
+router.get("/:id", authMiddleware_1.ensureAuth, claimCtl.getClaim);
+// Update header + nested CPM upsert
+router.patch("/:id", authMiddleware_1.ensureAuth, claimCtl.updateClaim);
+// Insurance actions
+router.post("/:id/action", authMiddleware_1.ensureAuth, (0, authMiddleware_1.ensureRole)("INSURANCE"), claimCtl.claimAction);
+router.post('/:id/approverAction', claimCtl.approverAction);
+// Manager actions
+router.post("/:id/manager", authMiddleware_1.ensureAuth, (0, authMiddleware_1.ensureRole)("MANAGER"), claimCtl.ManagerAction);
+// instead of upload.single("confirmationFiles")…
+router.post("/:id/userconfirm", authMiddleware_1.ensureAuth, upload.array("confirmationFiles", 10), // <— allow up to 10 files here
+claimCtl.userConfirm);
+// Create CPM form
+router.post("/:claimId/cpm", authMiddleware_1.ensureAuth, upload.fields([
+    { name: "damageFiles" },
+    { name: "estimateFiles" },
+    { name: "otherFiles" },
+    { name: 'userConfirmFiles' },
+]), claimCtl.createCpmForm);
+router.put("/:claimId/cpm", authMiddleware_1.ensureAuth, upload.fields([
+    { name: "damageFiles" },
+    { name: "estimateFiles" },
+    { name: "otherFiles" },
+    { name: 'userConfirmFiles' },
+]), claimCtl.updateCpmForm);
+router.put("/:id/signer", 
+// optionally insert a middleware here that checks req.user.role === "INSURANCE"
+claimController_1.updateSigner);
+router.get("/:id", authMiddleware_1.ensureAuth, claimCtl.getClaim);
+router.get("/:id/attachments", authMiddleware_1.ensureAuth, claimCtl.listAttachments);
+router.post("/:id/attachments", upload.array("attachments"), claimController_1.uploadAttachments);
 exports.default = router;
