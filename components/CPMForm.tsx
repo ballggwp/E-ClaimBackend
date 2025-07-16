@@ -131,9 +131,18 @@ export default function CPMForm({
     { key: "damageDetail", label: "รายละเอียดความเสียหาย" },
     { key: "damageAmount", label: "มูลค่าความเสียหาย" },
   ];
-  const allDamage   = [ ...existingFiles.filter(a=>a.type==='DAMAGE_IMAGE'),  ...files.damageFiles ];
-  const allEstimate = [ ...existingFiles.filter(a=>a.type==='ESTIMATE_DOC'),    ...files.estimateFiles ];
-  const allOther    = [ ...existingFiles.filter(a=>a.type==='OTHER_DOCUMENT'), ...files.otherFiles ];
+  const allDamage = [
+    ...existingFiles.filter((a) => a.type === "DAMAGE_IMAGE"),
+    ...files.damageFiles,
+  ];
+  const allEstimate = [
+    ...existingFiles.filter((a) => a.type === "ESTIMATE_DOC"),
+    ...files.estimateFiles,
+  ];
+  const allOther = [
+    ...existingFiles.filter((a) => a.type === "OTHER_DOCUMENT"),
+    ...files.otherFiles,
+  ];
 
   const handleClick = (saveAsDraft: boolean) => {
     if (!saveAsDraft) {
@@ -144,18 +153,22 @@ export default function CPMForm({
         if (!v || v.trim() === "") missing.push(label);
       });
 
-     if (!isEvidenceFlow) {
-      // count both old + new
-      const existingDamage = existingFiles.filter(f => f.type === 'DAMAGE_IMAGE').length;
-      const existingEstimate = existingFiles.filter(f => f.type === 'ESTIMATE_DOC').length;
+      if (!isEvidenceFlow) {
+        // count both old + new
+        const existingDamage = existingFiles.filter(
+          (f) => f.type === "DAMAGE_IMAGE"
+        ).length;
+        const existingEstimate = existingFiles.filter(
+          (f) => f.type === "ESTIMATE_DOC"
+        ).length;
 
-      if (existingDamage + files.damageFiles.length === 0) {
-        missing.push("รูปภาพความเสียหาย");
+        if (existingDamage + files.damageFiles.length === 0) {
+          missing.push("รูปภาพความเสียหาย");
+        }
+        if (existingEstimate + files.estimateFiles.length === 0) {
+          missing.push("เอกสารสำรวจความเสียหาย");
+        }
       }
-      if (existingEstimate + files.estimateFiles.length === 0) {
-        missing.push("เอกสารสำรวจความเสียหาย");
-      }
-    }
       if (missing.length) {
         Swal.fire({
           icon: "warning",
@@ -239,11 +252,7 @@ export default function CPMForm({
               {/* Approver dropdown */}
               {!readOnly && approverList.length > 0 && (
                 <ul
-                  className="
-    absolute top-full left-0 right-0 mt-1
-    bg-white border border-gray-300 rounded shadow-lg z-50
-    max-h-48 overflow-y-auto
-  "
+                  className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg z-50 max-h-48 overflow-y-auto"
                 >
                   {approverList.map((u) => (
                     <li
@@ -282,11 +291,7 @@ export default function CPMForm({
 
               {!readOnly && signerList.length > 0 && (
                 <ul
-                  className="
-    absolute top-full left-0 right-0 mt-1
-    bg-white border border-gray-300 rounded shadow-lg z-50
-    max-h-48 overflow-y-auto
-  "
+                  className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg z-50 max-h-48 overflow-y-auto"
                 >
                   {signerList.map((u: User) => (
                     <li
@@ -323,9 +328,21 @@ export default function CPMForm({
               </label>
               <input
                 name="phoneNum"
+                type="tel"
                 value={values.phoneNum || ""}
-                onChange={onChange}
+                onChange={(e) => {
+    onChange({
+  target: {
+    name: "phoneNum",
+    value: e.target.value.replace(/\D/g, ""),
+  },
+} as any);
+  }}
+                inputMode="numeric"
                 disabled={readOnly}
+                pattern="[0-9]{9,10}"
+                maxLength={10}
+                placeholder="เช่น 0876543210"
                 className={inputClass(readOnly)}
               />
             </div>
@@ -356,13 +373,15 @@ export default function CPMForm({
                   เวลา <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="time"
-                  name="accidentTime"
-                  value={values.accidentTime || ""}
-                  onChange={onChange}
-                  disabled={readOnly}
-                  className={inputClass(readOnly)}
-                />
+  type="time"
+  name="accidentTime"
+  value={values.accidentTime || ""}
+  onChange={onChange}
+  step={60}         // optional: 60s step
+  min="00:00"
+  max="23:59"
+  className={inputClass(readOnly)}
+/>
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm text-gray-600 mb-1">
@@ -387,6 +406,8 @@ export default function CPMForm({
                   value={values.cause || ""}
                   onChange={onChange}
                   disabled={readOnly}
+                  maxLength={250}
+                  placeholder="ไม่เกิน 250 ตัวอักษร"
                   className={inputClass(readOnly)}
                 />
               </div>
@@ -420,6 +441,8 @@ export default function CPMForm({
                   name="policeTime"
                   value={values.policeTime || ""}
                   onChange={onChange}
+                  min="00:00"
+  max="23:59"
                   disabled={readOnly}
                   className={inputClass(readOnly)}
                 />
@@ -491,6 +514,8 @@ export default function CPMForm({
                     value={values.damageDetail || ""}
                     onChange={onChange}
                     disabled={readOnly}
+                    maxLength={250}
+                    placeholder="ไม่เกิน 250 ตัวอักษร"
                     className={inputClass(readOnly)}
                   />
                 </div>
@@ -504,6 +529,10 @@ export default function CPMForm({
                     value={values.damageAmount || ""}
                     onChange={onChange}
                     disabled={readOnly}
+                    min={0}
+                    step={0.01}
+                    inputMode="decimal"
+                    placeholder="เช่น 10000.00"
                     className={inputClass(readOnly)}
                   />
                 </div>
@@ -516,6 +545,8 @@ export default function CPMForm({
                     value={values.victimDetail || ""}
                     onChange={onChange}
                     disabled={readOnly}
+                    maxLength={250}
+                    placeholder="ไม่เกิน 250 ตัวอักษร"
                     className={inputClass(readOnly)}
                   />
                 </div>
@@ -573,11 +604,22 @@ export default function CPMForm({
                   เบอร์โทรศัพท์
                 </label>
                 <input
-                  type="text"
+                  type="tel"
                   name="partnerPhone"
                   value={values.partnerPhone || ""}
-                  onChange={onChange}
+                 onChange={(e) => {
+    onChange({
+  target: {
+    name: "partnerPhone",
+    value: e.target.value.replace(/\D/g, ""),
+  },
+} as any);
+  }}
                   disabled={readOnly}
+                  inputMode="numeric"
+                  pattern="[0-9]{9,10}"
+                  maxLength={10}
+                  placeholder="เช่น 0812345678"
                   className={inputClass(readOnly)}
                 />
               </div>
@@ -603,6 +645,8 @@ export default function CPMForm({
                   value={values.partnerDamageDetail || ""}
                   onChange={onChange}
                   disabled={readOnly}
+                  maxLength={250}
+                  placeholder="ไม่เกิน 250 ตัวอักษร"
                   className={inputClass(readOnly)}
                 />
               </div>
@@ -616,6 +660,10 @@ export default function CPMForm({
                   value={values.partnerDamageAmount || ""}
                   onChange={onChange}
                   disabled={readOnly}
+                  min={0}
+                  step={0.01}
+                  inputMode="decimal"
+                  placeholder="เช่น 10000.00"
                   className={inputClass(readOnly)}
                 />
               </div>
@@ -628,6 +676,8 @@ export default function CPMForm({
                   value={values.partnerVictimDetail || ""}
                   onChange={onChange}
                   disabled={readOnly}
+                  maxLength={250}
+                  placeholder="ไม่เกิน 250 ตัวอักษร"
                   className={inputClass(readOnly)}
                 />
               </div>
@@ -635,70 +685,85 @@ export default function CPMForm({
           </section>
 
           {!readOnly && (
-  <section className="bg-blue-50 border border-gray-200 rounded-lg p-6 space-y-6">
-    <h2 className="text-lg font-semibold text-gray-700 mb-4">
-      แนบเอกสารตามรายการ
-    </h2>
+            <section className="bg-blue-50 border border-gray-200 rounded-lg p-6 space-y-6">
+              <h2 className="text-lg font-semibold text-gray-700 mb-4">
+                แนบเอกสารตามรายการ
+              </h2>
 
-    {(["damageFiles", "estimateFiles", "otherFiles"] as const).map((field, idx) => {
-      const label = field === "damageFiles"
-        ? "1) รูปภาพความเสียหาย"
-        : field === "estimateFiles"
-          ? "2) เอกสารสำรวจความเสียหาย"
-          : "3) เอกสารเพิ่มเติมอื่น ๆ";
+              {(["damageFiles", "estimateFiles", "otherFiles"] as const).map(
+                (field, idx) => {
+                  const label =
+                    field === "damageFiles"
+                      ? "1) รูปภาพความเสียหาย"
+                      : field === "estimateFiles"
+                      ? "2) เอกสารสำรวจความเสียหาย"
+                      : "3) เอกสารเพิ่มเติมอื่น ๆ";
 
-      // แยก existing กับ ใหม่
-     const typeMap: Record<
-  'damageFiles' | 'estimateFiles' | 'otherFiles',
-  AttachmentItem['type']
-> = {
-  damageFiles:   'DAMAGE_IMAGE',
-  estimateFiles: 'ESTIMATE_DOC',
-  otherFiles:    'OTHER_DOCUMENT',
-};
+                  // แยก existing กับ ใหม่
+                  const typeMap: Record<
+                    "damageFiles" | "estimateFiles" | "otherFiles",
+                    AttachmentItem["type"]
+                  > = {
+                    damageFiles: "DAMAGE_IMAGE",
+                    estimateFiles: "ESTIMATE_DOC",
+                    otherFiles: "OTHER_DOCUMENT",
+                  };
 
-// … then inside your .map((field, idx) => { …
-const attachmentType = typeMap[field];
-const exist          = existingFiles.filter(f => f.type === attachmentType);
-const added          = files[field];
+                  // … then inside your .map((field, idx) => { …
+                  const attachmentType = typeMap[field];
+                  const exist = existingFiles.filter(
+                    (f) => f.type === attachmentType
+                  );
+                  const added = files[field];
 
-      return (
-        <div key={field}>
-          <label className="block mb-2 font-medium text-gray-700">
-            {label} {idx < 2 && <span className="text-red-500">*</span>}
-          </label>
+                  return (
+                    <div key={field}>
+                      <label className="block mb-2 font-medium text-gray-700">
+                        {label}{" "}
+                        {idx < 2 && <span className="text-red-500">*</span>}
+                      </label>
 
-          {/* แสดงไฟล์เดิม */}
-          {exist.length > 0 && (
-            <ul className="mb-2">
-              {exist.map(f => (
-                <li key={f.id} className="flex items-center space-x-2 text-sm text-gray-700">
-                  <a href={f.url} target="_blank" rel="noopener noreferrer" className="underline">
-                    {f.fileName}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
+                      {/* แสดงไฟล์เดิม */}
+                      {exist.length > 0 && (
+                        <ul className="mb-2">
+                          {exist.map((f) => (
+                            <li
+                              key={f.id}
+                              className="flex items-center space-x-2 text-sm text-gray-700"
+                            >
+                              <a
+                                href={f.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline"
+                              >
+                                {f.fileName}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
 
-          {/* input ใหม่ */}
-          <label
-            htmlFor={field}
-            className="group flex flex-col items-center justify-center border-2 border-dashed border-gray-300 hover:border-blue-500 bg-white p-6 rounded-xl shadow-sm cursor-pointer transition-all"
-          >
-            <svg className="w-8 h-8 text-gray-400 group-hover:text-blue-500" /* … */ />
-            <span className="mt-2 text-gray-600 group-hover:text-blue-600 text-sm">
-              คลิกหรือวางไฟล์ที่นี่
-            </span>
-            <input
-              id={field}
-              type="file"
-              accept=".jpg,.jpeg,.png,.pdf,.xlsx"
-              multiple
-              onChange={(e) => onFileChange(e, field)}
-              className="hidden"
-            />
-          </label>
+                      {/* input ใหม่ */}
+                      <label
+                        htmlFor={field}
+                        className="group flex flex-col items-center justify-center border-2 border-dashed border-gray-300 hover:border-blue-500 bg-white p-6 rounded-xl shadow-sm cursor-pointer transition-all"
+                      >
+                        <svg
+                          className="w-8 h-8 text-gray-400 group-hover:text-blue-500" /* … */
+                        />
+                        <span className="mt-2 text-gray-600 group-hover:text-blue-600 text-sm">
+                          คลิกหรือวางไฟล์ที่นี่
+                        </span>
+                        <input
+                          id={field}
+                          type="file"
+                          accept=".jpg,.jpeg,.png,.pdf,.xlsx"
+                          multiple
+                          onChange={(e) => onFileChange(e, field)}
+                          className="hidden"
+                        />
+                      </label>
 
                       {files[field].length > 0 && (
                         <ul className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">

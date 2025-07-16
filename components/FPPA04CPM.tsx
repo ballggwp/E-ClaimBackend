@@ -368,6 +368,11 @@ export default function FPPA04Form({
           <input
             name="productionYear"
             type="number"
+            inputMode="numeric"
+            pattern="\d{4}"
+            maxLength={4}
+            min={1900}
+            max={new Date().getFullYear()}
             value={vals.productionYear}
             onChange={handleInput}
             disabled={!canEdit}
@@ -625,6 +630,9 @@ export default function FPPA04Form({
                   <input
                     type="number"
                     step="0.01"
+                    min="0"
+                    inputMode="decimal"
+                    pattern="^\d+(\.\d{1,2})?$"
                     value={a.amount}
                     onChange={(e) => changeAdj(idx, "amount", e.target.value)}
                     disabled={!canEdit}
@@ -665,6 +673,9 @@ export default function FPPA04Form({
           <input
             name="insurancePayout"
             type="number"
+            min="0"
+            inputMode="decimal"
+            pattern="^\d+(\.\d{1,2})?$"
             step="0.01"
             value={vals.insurancePayout}
             onChange={handleInput}
