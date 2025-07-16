@@ -1,21 +1,32 @@
 // authController.ts
 import { RequestHandler } from "express";
 import prisma from "../lib/prisma";
+import rateLimit from "express-rate-limit";
 import jwt from "jsonwebtoken";
 import axios from "axios";
 
+export const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // limit each IP to 10 requests per windowMs
+  message: "Too many login attempts, please try again later.",
+});
+
 export async function fetchAzureToken(): Promise<string> {
-  const res = await axios.post(
-    `https://login.microsoftonline.com/${process.env.AZURE_TENANT_ID}/oauth2/v2.0/token`,
-    new URLSearchParams({
-      client_id:     process.env.AZURE_CLIENT_ID!,
-      client_secret: process.env.AZURE_CLIENT_SECRET!,
-      scope:         process.env.AZURE_SCOPE!,
-      grant_type:    "client_credentials",
-    }).toString(),
-    { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
-  );
-  return res.data.access_token as string;
+  try {
+    const res = await axios.post(
+      `https://login.microsoftonline.com/${process.env.AZURE_TENANT_ID}/oauth2/v2.0/token`,
+      new URLSearchParams({
+        client_id: process.env.AZURE_CLIENT_ID!,
+        client_secret: process.env.AZURE_CLIENT_SECRET!,
+        scope: process.env.AZURE_SCOPE!,
+        grant_type: "client_credentials",
+      }).toString(),
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+    );
+    return res.data.access_token as string;
+  } catch (err: any) {
+    throw new Error("Failed to fetch Azure access token");
+  }
 }
 
 async function fetchUserInfoProfileWithPassword(
@@ -23,6 +34,7 @@ async function fetchUserInfoProfileWithPassword(
   password: string,
   azureToken: string
 ) {
+  
   // 1) authenticate upstream
   const authRes = await axios.post(
     `https://${process.env.SERVICE_HOST}/userinfo/api/v2/authen`,
@@ -38,7 +50,7 @@ async function fetchUserInfoProfileWithPassword(
 
   // 2) explicitly verify the API-level success code
   /* const { code, message, result } = authRes.data;
-  console.log(code)
+  
   if (code !== 200) {
     throw new Error(message || result?.error || "Invalid credentials");
   } */
@@ -65,13 +77,13 @@ async function fetchUserInfoProfileWithPassword(
 export const login: RequestHandler = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    //console.log(email,password)
+    
     
     // 1) Get an Azure AD token and verify credentials upstream
     const azureToken = await fetchAzureToken();
-    //console.log(azureToken)
+    
     const profile    = await fetchUserInfoProfileWithPassword(email, password, azureToken);
-    console.log(profile)
+    
     // 2) Upsert local user record
     const empNo = String(profile.id);
     const [deptTh,deptEn, posEn, posTh] = [
