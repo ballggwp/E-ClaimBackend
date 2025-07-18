@@ -185,4 +185,5 @@ model ClaimHistory {
   claimId   String
   status    ClaimStatus
   createdAt DateTime    @default(now())  // when it moved into `status`
+  @@unique([claimId, status])
 }

@@ -194,13 +194,39 @@ export const createFppa04Cpm: RequestHandler = async (req, res, next) => {
         adjustments: true,
       },
     });
-    await prisma.claim.update({
-      where: { id: req.params.id },
-      data: { status: 'PENDING_MANAGER_REVIEW' },
+    const updated = await prisma.$transaction(async (tx) => {
+  // 1) update the claim status
+  const upd = await tx.claim.update({
+    where: { id: req.params.id },
+    data: { status: ClaimStatus.PENDING_MANAGER_REVIEW },
+  });
+
+  // 2) upsert the history entry
+  const existing = await tx.claimHistory.findFirst({
+    where: {
+      claimId: req.params.id,
+      status: ClaimStatus.PENDING_MANAGER_REVIEW,
+    },
+  });
+
+  if (existing) {
+    // bump its timestamp
+    await tx.claimHistory.update({
+      where: { id: existing.id },
+      data: { createdAt: new Date() },
     });
-    await prisma.claimHistory.create({
-      data: { claimId, status: ClaimStatus.PENDING_MANAGER_REVIEW },
+  } else {
+    // create a fresh history record
+    await tx.claimHistory.create({
+      data: {
+        claimId: req.params.id,
+        status: ClaimStatus.PENDING_MANAGER_REVIEW,
+      },
     });
+  }
+
+  return upd;
+});
     
      const claim = await prisma.claim.findUnique({
   where: { id: claimId },

@@ -193,12 +193,21 @@ export const createClaim: RequestHandler = async (req, res, next) => {
       },
     });
 
-    await prisma.claimHistory.create({
-      data: {
-        claimId: claim.id,
-        status: claim.status,
-      },
+    const existing = await prisma.claimHistory.findFirst({
+      where: { claimId: claim.id, status: claim.status },
     });
+
+    if (existing) {
+      // (unlikely on a brand-new claim, but safe if you ever re-use createClaim)
+      await prisma.claimHistory.update({
+        where: { id: existing.id },
+        data: { createdAt: new Date() },
+      });
+    } else {
+      await prisma.claimHistory.create({
+        data: { claimId: claim.id, status: claim.status },
+      });
+    }
     if (saveAsDraft !== "true") {
       const newClaimId = claim.id;
 
@@ -452,17 +461,34 @@ export const claimAction: RequestHandler = async (req, res, next) => {
     }
 
     // Atomically update claim and history
-    const [updatedClaim] = await prisma.$transaction([
-      prisma.claim.update({
+    const updatedClaim = await prisma.$transaction(async (tx) => {
+      // a) update claim
+      const c = await tx.claim.update({
         where: { id },
         data: {
           status: newStatus,
           ...(comment && { insurerComment: comment }),
         },
         include: { attachments: true },
-      }),
-      prisma.claimHistory.create({ data: { claimId: id, status: newStatus } }),
-    ]);
+      });
+
+      // b) upsert history row
+      const existing = await tx.claimHistory.findFirst({
+        where: { claimId: id, status: newStatus },
+      });
+      if (existing) {
+        await tx.claimHistory.update({
+          where: { id: existing.id },
+          data: { createdAt: new Date() },
+        });
+      } else {
+        await tx.claimHistory.create({
+          data: { claimId: id, status: newStatus },
+        });
+      }
+
+      return c;
+    });
 
     const { createdByName, approverEmail, docNum, categorySub } = updatedClaim;
 
@@ -536,18 +562,39 @@ export const ManagerAction: RequestHandler = async (req, res, next) => {
       action === "approve"
         ? ClaimStatus.PENDING_USER_CONFIRM
         : ClaimStatus.PENDING_INSURER_REVIEW;
-
-    const [updated] = await prisma.$transaction([
-      prisma.claim.update({
+    
+    const updatedClaim = await prisma.$transaction(async (tx) => {
+      // 1) update the claim’s status & comment
+      const updated = await tx.claim.update({
         where: { id },
-        data: { status: newStatus, insurerComment: comment },
-      }),
-      prisma.claimHistory.create({
-        data: { claimId: id, status: newStatus },
-      }),
-    ]);
+        data: {
+          status: newStatus,
+          insurerComment: comment,
+        },
+      });
 
-    const { createdByName, approverEmail, docNum, categorySub } = updated;
+      // 2) find existing history entry for this (claimId, status)
+      const existingHist = await tx.claimHistory.findFirst({
+        where: { claimId: id, status: newStatus },
+      });
+
+      if (existingHist) {
+        // bump its timestamp
+        await tx.claimHistory.update({
+          where: { id: existingHist.id },
+          data: { createdAt: new Date() },
+        });
+      } else {
+        // insert a fresh history record
+        await tx.claimHistory.create({
+          data: { claimId: id, status: newStatus },
+        });
+      }
+
+      return updated;
+    });
+
+    const { createdByName, approverEmail, docNum, categorySub } = updatedClaim;
 
     if (action === "approve") {
       const user = await prisma.user.findFirst({
@@ -594,7 +641,7 @@ export const ManagerAction: RequestHandler = async (req, res, next) => {
       }
     }
 
-    res.json({ claim: updated });
+    res.json({ claim: updatedClaim });
   } catch (err) {
     next(err);
   }
@@ -845,13 +892,29 @@ export const updateCpmForm: RequestHandler = async (req, res, next) => {
     }
     const saveAsDraft = req.body.saveAsDraft === "true";
     if (!saveAsDraft) {
-      await prisma.claim.update({
+      const updatedClaim = await prisma.claim.update({
         where: { id: claimId },
         data: {
           status: ClaimStatus.PENDING_APPROVER_REVIEW,
-          submittedAt: new Date(), // also stamp when it was actually submitted
+          submittedAt: now,
         },
       });
+
+      // 5) Record into claimHistory
+      const existingHistory = await prisma.claimHistory.findFirst({
+        where: { claimId: updatedClaim.id, status: updatedClaim.status },
+      });
+      if (existingHistory) {
+        await prisma.claimHistory.update({
+          where: { id: existingHistory.id },
+          data: { createdAt: now },
+        });
+      } else {
+        await prisma.claimHistory.create({
+          data: { claimId: updatedClaim.id, status: updatedClaim.status },
+        });
+      }
+      
       const db = await prisma.claim.findUnique({
         where: { id: claimId },
         select: {
@@ -921,21 +984,38 @@ export const approverAction: RequestHandler = async (req, res, next) => {
     }
 
     // transaction: update + history
-    const [updated] = await prisma.$transaction([
-      prisma.claim.update({
+   const updated = await prisma.$transaction(async (tx) => {
+      // 1) update the claim
+      const u = await tx.claim.update({
         where: { id },
         data: {
           status: newStatus,
           ...(comment && { insurerComment: comment }),
         },
-      }),
-      prisma.claimHistory.create({
-        data: { claimId: id, status: newStatus },
-      }),
-    ]);
+      });
+
+      // 2) see if we already have a history row for this (claimId + status)
+      const existing = await tx.claimHistory.findFirst({
+        where: { claimId: id, status: newStatus },
+      });
+
+      if (existing) {
+        // bump its timestamp
+        await tx.claimHistory.update({
+          where: { id: existing.id },
+          data: { createdAt: new Date() },
+        });
+      } else {
+        // create a brand‐new history entry
+        await tx.claimHistory.create({
+          data: { claimId: id, status: newStatus },
+        });
+      }
+
+      return u;
+    });
 
     if (action === "approve") {
-      console.log(action);
       //    — lookup the claim's signer email & name & subcategory
 
       // สร้างลิงก์เชิญทีมประกันภัยมาเช็ค
@@ -1042,27 +1122,41 @@ export const userConfirm: RequestHandler = async (req, res, next) => {
       await prisma.attachment.createMany({ data: creates });
     }
 
-    await prisma.$transaction([
-      prisma.claim.update({
-        where: { id: req.params.id },
-        data: {
-          status:
-            action === "confirm"
-              ? ClaimStatus.COMPLETED
-              : ClaimStatus.PENDING_INSURER_REVIEW,
-          ...(action === "reject" && { insurerComment: `${comment}` }),
-        },
-      }),
-      prisma.claimHistory.create({
-        data: {
-          claimId: req.params.id,
-          status:
-            action === "confirm"
-              ? ClaimStatus.COMPLETED
-              : ClaimStatus.PENDING_INSURER_REVIEW,
-        },
-      }),
-    ]);
+    const newStatus =
+      action === "confirm"
+        ? ClaimStatus.COMPLETED
+        : ClaimStatus.PENDING_INSURER_REVIEW;
+
+    // 3) Update claim + history in a transaction
+    await prisma.$transaction(async (tx) => {
+  // 1) Update the claim
+  await tx.claim.update({
+    where: { id: req.params.id },
+    data: {
+      status: newStatus,
+      ...(action === "reject" && { insurerComment: comment }),
+    },
+  });
+
+  // 2) Upsert the history row for (claimId, status)
+  const existing = await tx.claimHistory.findFirst({
+    where: { claimId: req.params.id, status: newStatus },
+  });
+
+  if (existing) {
+    // just bump the timestamp on the existing row
+    await tx.claimHistory.update({
+      where: { id: existing.id },
+      data: { createdAt: new Date() },
+    });
+  } else {
+    // create a fresh history entry
+    await tx.claimHistory.create({
+      data: { claimId: req.params.id, status: newStatus },
+    });
+  }
+});
+
 
     const claim = await prisma.claim.findUnique({ where: { id: req.params.id }, select: { approverEmail: true, categorySub: true, docNum: true } });
     if (claim) {
@@ -1166,3 +1260,43 @@ export const uploadAttachments: RequestHandler = async (
     next(err);
   }
 };
+export const handleSearch: RequestHandler = async (req, res, next) => {
+  try {
+    const { categoryMain, categorySub, excludeStatus, userEmail } = req.query;
+    if (
+      typeof categoryMain !== "string" ||
+      typeof categorySub !== "string"
+    ) {
+      res.status(400).json({ message: "Missing categoryMain or categorySub" });
+      return;
+    }
+
+    // build the where filter
+    const where: any = {
+      categoryMain,
+      categorySub,
+      // exclude a status
+      ...(excludeStatus
+        ? { status: { not: excludeStatus } }
+        : {}),
+      // if userEmail supplied, filter via the relation:
+      ...(typeof userEmail === "string"
+        ? { createdBy: { email: userEmail } }
+        : {}),
+    };
+
+    const results = await prisma.claim.findMany({
+      where,
+      orderBy: { updatedAt: "desc" },
+    });
+
+    res.json(results);
+    return;
+  } catch (err) {
+    next(err);
+    return;
+  }
+};
+
+
+

@@ -3,7 +3,7 @@ import express from "express";
 import multer from "multer";
 import * as claimCtl from "../controllers/claimController";
 import { ensureAuth, ensureRole } from "../middleware/authMiddleware";
-import { updateSigner,uploadAttachments } from "../controllers/claimController";
+import {  updateSigner,uploadAttachments } from "../controllers/claimController";
 const router = express.Router();
 const upload = multer({ dest: "uploads/" });
 // List & filter claims
@@ -12,7 +12,7 @@ router.get(
   ensureAuth,
   claimCtl.listClaims
 );
-
+router.get("/search", claimCtl.handleSearch);
 // Create a new claim — now req.user is guaranteed
 router.post(
   "/",

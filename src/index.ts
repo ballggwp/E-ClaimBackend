@@ -8,6 +8,7 @@ import fppa04Routes from "./routes/fppa04"
 import fileUpload from "express-fileupload";
 import authMiddleware from './middleware/authMiddleware'
 import path from "path"
+import reportRoutes from "./routes/reports";
 dotenv.config();
 const app = express();
 app.use(express.json());
@@ -18,6 +19,7 @@ app.use(
     allowedHeaders: ["Authorization", "Content-Type"],           
   })
 )
+app.use("/api/reports", reportRoutes);
 app.use(
   "/uploads",
   express.static(path.join(process.cwd(), "uploads"))
