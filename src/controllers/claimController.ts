@@ -610,7 +610,7 @@ export const ManagerAction: RequestHandler = async (req, res, next) => {
           body: [
             `<p>เรียน ${user.name}</p>`,
             `<p>เคลมเลขที่ <strong>${docNum}</strong> ได้รับการอนุมัติจากผู้จัดการแล้ว</p>`,
-            `<p>กรุณายืนยันข้อมูลที่ระบบ: <a href=\"${process.env.FE_PORT}/fppa04/${categorySub?.toLowerCase()}/${id}\">คลิกที่นี่</a></p>`,
+            `<p>กรุณายืนยันข้อมูลที่ระบบ: <a href=\"${process.env.FE_PORT}/fppa04/${categorySub}/${id}\">คลิกที่นี่</a></p>`,
           ].filter(Boolean).join("\n"),
         };
         try {
@@ -630,7 +630,7 @@ export const ManagerAction: RequestHandler = async (req, res, next) => {
           `<p>เรียน ทีมประกัน</p>`,
           `<p>เคลมเลขที่ <strong>${docNum}</strong> ถูกปฏิเสธโดยผู้จัดการ</p>`,
           comment ? `<p>ความคิดเห็น: ${comment}</p>` : "",
-          `<p>กรุณาตรวจสอบที่ระบบ: <a href=\"${process.env.FE_PORT}/fppa04/${categorySub?.toLowerCase()}/${id}\">คลิกที่นี่</a></p>`,
+          `<p>กรุณาตรวจสอบที่ระบบ: <a href=\"${process.env.FE_PORT}/fppa04/${categorySub}/${id}\">คลิกที่นี่</a></p>`,
         ].filter(Boolean).join("\n"),
       };
       try {
