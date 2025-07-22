@@ -2,6 +2,7 @@ import express from "express";
 import * as f04 from "../controllers/fppa04Controller";
 import multer from "multer";
 import path from "path";
+import { saveFile } from "../services/fileService";
 const router = express.Router();
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
@@ -32,13 +33,43 @@ router.patch ("/:id",      f04.updateFppa04Base);
 router.post(
   "/:id/cpm",
   upload.array("signatureFiles", 10),
-  f04.createFppa04Cpm
+  async (req, res, next) => {
+    try {
+      // req.files is an array of Multer File objects
+      const files = (req.files as Express.Multer.File[]);
+
+      // run each through your helper
+      // saveFile moves them into uploads/ with proper UTF-8 names
+      // and returns the public URL path
+      const signatureUrls = files.map(saveFile);
+
+      // attach to body so your controller can store them
+      req.body.signatureUrls = signatureUrls;
+
+      // now call into your normal controller
+      return f04.createFppa04Cpm(req, res, next);
+    } catch (err) {
+      next(err);
+    }
+  }
 );
+
+// same for PATCH if you want updates
 router.patch(
-  '/:id/cpm',
-  upload.array("signatureFiles",10),
-  f04.createFppa04Cpm
+  "/:id/cpm",
+  upload.array("signatureFiles", 10),
+  async (req, res, next) => {
+    try {
+      const files = (req.files as Express.Multer.File[]);
+      const signatureUrls = files.map(saveFile);
+      req.body.signatureUrls = signatureUrls;
+      return f04.createFppa04Cpm(req, res, next);
+    } catch (err) {
+      next(err);
+    }
+  }
 );
+
 
 // POST   /api/fppa04/:id/items          → add item
 // PATCH  /api/fppa04/:id/items/:itemId  → update item
