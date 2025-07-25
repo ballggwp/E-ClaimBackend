@@ -1,0 +1,39 @@
+services:
+  
+  backend:
+    build:
+      context: ./
+      dockerfile: dockerfile.app
+    container_name: eclaim-backend
+    environment:
+      - DATABASE_URL=postgresql://eclaimuser:EC1@!mM!trph01@10.25.69.250:5432/eclaim?schema=public
+      - PORT=5000
+      - JWT_SECRET=ajubviqjporihvmqio81540mfojndu919u3
+      - FE_PORT=http://localhost:3000
+      - AZURE_TENANT_ID=097b580b-b474-487c-8883-46e0bb1b5c11
+      - AZURE_CLIENT_ID=4ab707a0-b2fc-408d-bf91-7baccbc85143
+      - AZURE_CLIENT_SECRET=WQV8Q~GqJvjJrefS8ExHvH3WNYdAuzXdJ~SJiaCM
+      - AZURE_SUBSCRIPTION_KEY=c0ce1d298fa54459b5c728872f3c06b7
+      - AZURE_SCOPE=api://userinfo/.default
+      - SERVICE_HOST=mitrservices-internal.mitrphol.com
+    ports:
+      - "5001:5000"
+    networks:
+        eclaim-network:
+          ipv4_address: 172.28.5.6
+
+networks:
+    eclaim-network:
+        driver: bridge
+        external: true
+        ipam:
+            config:
+                - subnet: 172.28.5.0/24
+                  gateway: 172.28.5.1
+                  ip_range: 172.28.5.0/24
+
+volumes:
+  postgres_data:
+    name: eclaim-project_postgres_data
+    external: true
+ 

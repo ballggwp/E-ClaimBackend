@@ -239,7 +239,7 @@ export const createFppa04Cpm: RequestHandler = async (req, res, next) => {
         body: [
           `<p>เรียนผู้จัดการฝ่ายประกันกลุ่ม</p>`,
           `<p>เคลมเลขที่ <strong>${claim?.docNum}</strong> ได้รับการอนุมัติเรียบร้อยแล้ว</p>`,
-          `<p>กรุณาตรวจสอบรายละเอียดเพิ่มเติมที่ระบบ: <a href="${process.env.FE_PORT}/fppa04/CPM/${claimId}">คลิกที่นี่</a></p>`,
+          `<p>กรุณาตรวจสอบรายละเอียดเพิ่มเติมที่ระบบ: <a href="${process.env.FE_PORT}/claim/fppa04/CPM/${claimId}">คลิกที่นี่</a></p>`,
         ].join("\n"),
       };
       try {

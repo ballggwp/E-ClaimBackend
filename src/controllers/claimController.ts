@@ -228,9 +228,9 @@ export const createClaim: RequestHandler = async (req, res, next) => {
         sendTo: [`${db.approverEmail}` ],
         topic: `แจ้งอนุมัติ – Claim ${db.docNum}`,
         body: [
-          `<p>เรียน${db.approverName}</p>`,
+          `<p>เรียน ${db.approverName}</p>`,
           `<p>มีเคลมเลขที่ <strong>${db.docNum}</strong> รอการอนุมัติ</p>`,
-          `<p>กรุณาตรวจสอบรายละเอียดเพิ่มเติมที่ระบบ: <a href="${process.env.FE_PORT}/claims/${categorySub?.toLowerCase()}/${newClaimId}">คลิกที่นี่</a></p>`,
+          `<p>กรุณาตรวจสอบรายละเอียดเพิ่มเติมที่ระบบ: <a href="${process.env.FE_PORT}/claim/claims/${categorySub?.toLowerCase()}/${newClaimId}">คลิกที่นี่</a></p>`,
         ].join("\n"),
       };
       console.log("📧 Sending mail payload:", mailPayload);
@@ -515,7 +515,7 @@ export const claimAction: RequestHandler = async (req, res, next) => {
             `<p>เรียน ${creator.name}</p>`,
             comment ? `<p>ความคิดเห็น: ${comment}</p>` : "",
             `<p>สถานะล่าสุดของเคลมเลขที่ <strong>${docNum}</strong> คือ <em>${newStatus}</em></p>`,
-            `<p>กรุณาตรวจสอบเพิ่มเติมที่ระบบ: <a href="${process.env.FE_PORT}/claims/${categorySub?.toLowerCase()}/${id}">คลิกที่นี่</a></p>`,
+            `<p>กรุณาตรวจสอบเพิ่มเติมที่ระบบ: <a href="${process.env.FE_PORT}/claim/claims/${categorySub?.toLowerCase()}/${id}">คลิกที่นี่</a></p>`,
           ]
             .filter(Boolean)
             .join("\n"),
@@ -610,7 +610,7 @@ export const ManagerAction: RequestHandler = async (req, res, next) => {
           body: [
             `<p>เรียน ${user.name}</p>`,
             `<p>เคลมเลขที่ <strong>${docNum}</strong> ได้รับการอนุมัติจากผู้จัดการแล้ว</p>`,
-            `<p>กรุณายืนยันข้อมูลที่ระบบ: <a href=\"${process.env.FE_PORT}/fppa04/${categorySub}/${id}\">คลิกที่นี่</a></p>`,
+            `<p>กรุณายืนยันข้อมูลที่ระบบ: <a href=\"${process.env.FE_PORT}/claim/fppa04/${categorySub}/${id}\">คลิกที่นี่</a></p>`,
           ].filter(Boolean).join("\n"),
         };
         try {
@@ -630,7 +630,7 @@ export const ManagerAction: RequestHandler = async (req, res, next) => {
           `<p>เรียน ทีมประกัน</p>`,
           `<p>เคลมเลขที่ <strong>${docNum}</strong> ถูกปฏิเสธโดยผู้จัดการ</p>`,
           comment ? `<p>ความคิดเห็น: ${comment}</p>` : "",
-          `<p>กรุณาตรวจสอบที่ระบบ: <a href=\"${process.env.FE_PORT}/fppa04/${categorySub}/${id}\">คลิกที่นี่</a></p>`,
+          `<p>กรุณาตรวจสอบที่ระบบ: <a href=\"${process.env.FE_PORT}/claim/fppa04/${categorySub}/${id}\">คลิกที่นี่</a></p>`,
         ].filter(Boolean).join("\n"),
       };
       try {
@@ -930,7 +930,7 @@ export const updateCpmForm: RequestHandler = async (req, res, next) => {
         throw new Error(`Claim ${claimId} missing subcategory`);
       }
       
-      const link = `${process.env.FE_PORT}/claims/${db.categorySub?.toLowerCase()}/${claimId}`;
+      const link = `${process.env.FE_PORT}/claim/claims/${db.categorySub?.toLowerCase()}/${claimId}`;
       const mailPayload = {
         sendFrom: "natchar@mitrphol.com"/* natchar@mitrphol.com */,
         sendTo: [`${db.approverEmail}` /* approverEmail */ ],
@@ -938,7 +938,7 @@ export const updateCpmForm: RequestHandler = async (req, res, next) => {
         body: [
           `<p>เรียน${db.approverName}</p>`,
           `<p>มีเคลมเลขที่ <strong>${db.docNum}</strong> รอการอนุมัติ</p>`,
-          `<p>กรุณาตรวจสอบรายละเอียดเพิ่มเติมที่ระบบ: <a href="${process.env.FE_PORT}/claims/${db.categorySub?.toLowerCase()}/${claimId}">คลิกที่นี่</a></p>`,
+          `<p>กรุณาตรวจสอบรายละเอียดเพิ่มเติมที่ระบบ: <a href="${process.env.FE_PORT}/claim/claims/${db.categorySub?.toLowerCase()}/${claimId}">คลิกที่นี่</a></p>`,
         ].join("\n"),
       };
       console.log("📧 Sending mail payload:", mailPayload);
@@ -1019,7 +1019,7 @@ export const approverAction: RequestHandler = async (req, res, next) => {
       //    — lookup the claim's signer email & name & subcategory
 
       // สร้างลิงก์เชิญทีมประกันภัยมาเช็ค
-      const link = `${process.env.FE_PORT}/claims/${updated.categorySub?.toLowerCase()}/${id}`;
+      const link = `${process.env.FE_PORT}/claim/claims/${updated.categorySub?.toLowerCase()}/${id}`;
 
       const mailPayload = {
         sendFrom: "natchar@mitrphol.com"/* natchar@mitrphol.com */,
@@ -1161,8 +1161,8 @@ export const userConfirm: RequestHandler = async (req, res, next) => {
     const claim = await prisma.claim.findUnique({ where: { id: req.params.id }, select: { approverEmail: true, categorySub: true, docNum: true } });
     if (claim) {
       const linkUrl = action === "confirm"
-        ? `${process.env.FE_PORT}/download`
-        : `${process.env.FE_PORT}/fppa04/${claim.categorySub}/${req.params.id}`;
+        ? `${process.env.FE_PORT}/claim/download`
+        : `${process.env.FE_PORT}/claim/fppa04/${claim.categorySub}/${req.params.id}`;
       const subjectAction = action === "confirm" ? "ผู้ใช้ยืนยัน" : "ผู้ใช้ปฏิเสธ";
       const bodyAction = action === "confirm"
         ? `<p>ผู้ใช้ยืนยันเคลมเลขที่ <strong>${claim.docNum}</strong> เรียบร้อยแล้ว</p>`
