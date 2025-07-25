@@ -1168,8 +1168,8 @@ export const userConfirm: RequestHandler = async (req, res, next) => {
         ? `<p>ผู้ใช้ยืนยันเคลมเลขที่ <strong>${claim.docNum}</strong> เรียบร้อยแล้ว</p>`
         : `<p>ผู้ใช้ปฏิเสธเคลมเลขที่ <strong>${claim.docNum}</strong></p>`;
       const mailPayload = {
-        sendFrom: "J.Waitin@mitrphol.com"/* natchar@mitrphol.com */,
-        sendTo: ["J.Waitin@mitrphol.com"/* MP_GroupInsurance@mitrphol.com */],
+        sendFrom: "natchar@mitrphol.com"/* natchar@mitrphol.com */,
+        sendTo: ["MP_GroupInsurance@mitrphol.com"/* MP_GroupInsurance@mitrphol.com */],
         topic: `${subjectAction} – Claim ${claim.docNum}`,
         body: [
           `<p>เรียน ทีมประกัน</p>`,
