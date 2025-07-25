@@ -4,7 +4,7 @@ import { Prisma, ClaimStatus, AttachmentType } from "@prisma/client";
 import prisma from "../lib/prisma";
 import axios from "axios";
 import { fetchAzureTokenEmail } from "./claimController";
-
+import { saveFile } from "../services/fileService" // import path อาจต่างไป
 // ─── Create FPPA-04 Base ───────────────────────────────────────────────────────
 export const createFppa04Base: RequestHandler = async (req, res, next) => {
   try {
@@ -111,7 +111,7 @@ export const updateFppa04Base: RequestHandler = async (req, res, next) => {
 export const createFppa04Cpm: RequestHandler = async (req, res, next) => {
   try {
     const claimId = req.params.id;
-
+    
     // 1) Look up the base record
     const base = await prisma.fppa04Base.findUnique({
       where: { claimId },
@@ -144,8 +144,8 @@ export const createFppa04Cpm: RequestHandler = async (req, res, next) => {
     const files = Array.isArray(req.files)
       ? (req.files as Express.Multer.File[])
       : [];
+      const signatureFiles = files.map(saveFile);
     // now map to your public URL or relative path:
-    const signatureFiles = files.map(f => `/uploads/${f.filename}`); 
 
     // 4) Build upsert payload
     const payload = {
