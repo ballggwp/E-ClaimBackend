@@ -233,8 +233,8 @@ export const createFppa04Cpm: RequestHandler = async (req, res, next) => {
   select: { docNum: true, categorySub: true},
 });
       const mailPayload = {
-        sendFrom: "J.Waitin@mitrphol.com",
-        sendTo: ["J.Waitin@mitrphol.com" /*manager.email*/],
+        sendFrom: "natchar@mitrphol.com",
+        sendTo: [`suvimolv@mitrphol.com`],
         topic: `แจ้งอนุมัติ – Claim ${claim?.docNum}`,
         body: [
           `<p>เรียนผู้จัดการฝ่ายประกันกลุ่ม</p>`,

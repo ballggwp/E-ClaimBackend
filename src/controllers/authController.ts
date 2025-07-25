@@ -49,11 +49,11 @@ async function fetchUserInfoProfileWithPassword(
   );
 
   // 2) explicitly verify the API-level success code
-  /* const { code, message, result } = authRes.data;
+   const { code, message, result } = authRes.data;
   
   if (code !== 200) {
     throw new Error(message || result?.error || "Invalid credentials");
-  } */
+  } 
 
   // 3) fetch the user profile
   const profileRes = await axios.post(

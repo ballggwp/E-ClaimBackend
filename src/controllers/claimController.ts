@@ -3,7 +3,7 @@ import type { RequestHandler } from "express";
 import { Prisma, ClaimStatus, AttachmentType } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { saveFile } from "../services/fileService";
-import { format } from "date-fns";
+import { addISOWeekYears, format } from "date-fns";
 import { fetchAzureToken, fetchUserInfoProfile } from "./authController";
 import axios from "axios";
 // ─── List Claims ───────────────────────────────────────────────────────────────
@@ -224,8 +224,8 @@ export const createClaim: RequestHandler = async (req, res, next) => {
       if (!db) throw new Error(`Claim ${newClaimId} not found`);
 
       const mailPayload = {
-        sendFrom: "J.Waitin@mitrphol.com"/* natchar@mitrphol.com */,
-        sendTo: ["J.Waitin@mitrphol.com" /* approverEmail */ ],
+        sendFrom: "natchar@mitrphol.com",
+        sendTo: [`${db.approverEmail}` ],
         topic: `แจ้งอนุมัติ – Claim ${db.docNum}`,
         body: [
           `<p>เรียน${db.approverName}</p>`,
@@ -504,9 +504,9 @@ export const claimAction: RequestHandler = async (req, res, next) => {
       });
       if (creator) {
         const mailPayload = {
-          sendFrom: "J.Waitin@mitrphol.com"/* natchar@mitrphol.com */,
-          sendTo: ["J.Waitin@mitrphol.com" /*creator.email*/],
-          sendCC: ["J.Waitin@mitrphol.com" /*approverEmail*/],
+          sendFrom: "natchar@mitrphol.com"/* natchar@mitrphol.com */,
+          sendTo: [`${creator.email}` /*creator.email*/],
+          sendCC: [`${approverEmail}` /*approverEmail*/],
           topic:
             action === "request_evidence"
               ? `ขอเอกสารเพิ่มเติม – Claim ${docNum}`
@@ -603,9 +603,9 @@ export const ManagerAction: RequestHandler = async (req, res, next) => {
       });
       if (user) {
         const mailPayload = {
-          sendFrom: "J.Waitin@mitrphol.com"/* natchar@mitrphol.com */,
-          sendTo: ["J.Waitin@mitrphol.com"/* user.email */],
-          sendCC: ["J.Waitin@mitrphol.com"/* MP_GroupInsurance@mitrphol.com */],
+          sendFrom: "natchar@mitrphol.com"/* natchar@mitrphol.com */,
+          sendTo: [`${user.email}`/* user.email */],
+          sendCC: ["MP_GroupInsurance@mitrphol.com"/* MP_GroupInsurance@mitrphol.com */],
           topic: `ผู้จัดการอนุมัติ – Claim ${docNum}`,
           body: [
             `<p>เรียน ${user.name}</p>`,
@@ -623,8 +623,8 @@ export const ManagerAction: RequestHandler = async (req, res, next) => {
     } else {
       // manager rejected: notify insurance only
       const mailPayload = {
-        sendFrom: "J.Waitin@mitrphol.com"/* natchar@mitrphol.com */,
-        sendTo: ["J.Waitin@mitrphol.com"/* MP_GroupInsurance@mitrphol.com */],
+        sendFrom: "natchar@mitrphol.com"/* natchar@mitrphol.com */,
+        sendTo: ["MP_GroupInsurance@mitrphol.com"/* MP_GroupInsurance@mitrphol.com */],
         topic: `ผู้จัดการปฏิเสธ – Claim ${docNum}`,
         body: [
           `<p>เรียน ทีมประกัน</p>`,
@@ -932,8 +932,8 @@ export const updateCpmForm: RequestHandler = async (req, res, next) => {
       
       const link = `${process.env.FE_PORT}/claims/${db.categorySub?.toLowerCase()}/${claimId}`;
       const mailPayload = {
-        sendFrom: "J.Waitin@mitrphol.com"/* natchar@mitrphol.com */,
-        sendTo: ["J.Waitin@mitrphol.com" /* approverEmail */ ],
+        sendFrom: "natchar@mitrphol.com"/* natchar@mitrphol.com */,
+        sendTo: [`${db.approverEmail}` /* approverEmail */ ],
         topic: `แจ้งอนุมัติ – Claim ${db.docNum}`,
         body: [
           `<p>เรียน${db.approverName}</p>`,
@@ -1022,8 +1022,8 @@ export const approverAction: RequestHandler = async (req, res, next) => {
       const link = `${process.env.FE_PORT}/claims/${updated.categorySub?.toLowerCase()}/${id}`;
 
       const mailPayload = {
-        sendFrom: "J.Waitin@mitrphol.com"/* natchar@mitrphol.com */,
-        sendTo: ["J.Waitin@mitrphol.com"], //"MP_GroupInsurance@mitrphol.com",         // ส่งถึงทีมประกันภัยทั้งทีม
+        sendFrom: "natchar@mitrphol.com"/* natchar@mitrphol.com */,
+        sendTo: ["MP_GroupInsurance@mitrphol.com"], //"MP_GroupInsurance@mitrphol.com",         // ส่งถึงทีมประกันภัยทั้งทีม
         topic: "มีเคลมรอตรวจสอบโดยทีมประกันภัย",
         body: [
           `<p>เรียน ทีมประกันภัย</p>`,
